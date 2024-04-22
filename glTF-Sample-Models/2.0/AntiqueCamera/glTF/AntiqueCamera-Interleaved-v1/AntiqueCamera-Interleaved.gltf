@@ -1,0 +1,182 @@
+{
+  "asset": { "generator": "glTF-Transform v3.10.0", "version": "2.0" },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 18360,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 41838,
+      "bufferView": 0,
+      "byteOffset": 36720
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 6510,
+      "max": [2.6307950019836426, 9.506563186645508, 2.852458953857422],
+      "min": [-3.324300527572632, -0.0014147758483886719, -1.7042126655578613],
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 6510,
+      "bufferView": 1,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 6510,
+      "bufferView": 1,
+      "byteOffset": 24
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 14668,
+      "max": [1.8916611671447754, 12.645012855529785, 1.2003434896469116],
+      "min": [-1.8916611671447754, 9.395228385925293, -1.200343370437622],
+      "bufferView": 2,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5126,
+      "count": 14668,
+      "bufferView": 2,
+      "byteOffset": 12
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5126,
+      "count": 14668,
+      "bufferView": 2,
+      "byteOffset": 24
+    }
+  ],
+  "bufferViews": [
+    { "buffer": 0, "byteOffset": 0, "byteLength": 120396, "target": 34963 },
+    {
+      "buffer": 0,
+      "byteOffset": 120396,
+      "byteLength": 208320,
+      "byteStride": 32,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 328716,
+      "byteLength": 469376,
+      "byteStride": 32,
+      "target": 34962
+    }
+  ],
+  "samplers": [{ "wrapS": 10497, "wrapT": 10497 }],
+  "textures": [
+    { "source": 1, "sampler": 0 },
+    { "source": 0, "sampler": 0 },
+    { "source": 4, "sampler": 0 },
+    { "source": 2, "sampler": 0 },
+    { "source": 3, "sampler": 0 },
+    { "source": 5, "sampler": 0 }
+  ],
+  "images": [
+    {
+      "name": "camera_camera_Normal",
+      "mimeType": "image/png",
+      "uri": "normal_1.png"
+    },
+    {
+      "name": "camera_camera_BaseColor",
+      "mimeType": "image/png",
+      "uri": "baseColor_1.png"
+    },
+    {
+      "name": "camera_tripod_BaseColor",
+      "mimeType": "image/png",
+      "uri": "baseColor_2.png"
+    },
+    {
+      "name": "camera_tripod_Normal",
+      "mimeType": "image/png",
+      "uri": "normal_2.png"
+    },
+    {
+      "name": "camera_camera_Roughness",
+      "mimeType": "image/png",
+      "uri": "metallicRoughness_1.png"
+    },
+    {
+      "name": "camera_tripod_Roughness",
+      "mimeType": "image/png",
+      "uri": "metallicRoughness_2.png"
+    }
+  ],
+  "buffers": [{ "uri": "AntiqueCamera-Interleaved.bin", "byteLength": 798092 }],
+  "materials": [
+    {
+      "name": "camera",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": { "index": 0 },
+        "metallicRoughnessTexture": { "index": 2 }
+      },
+      "normalTexture": { "index": 1 }
+    },
+    {
+      "name": "tripod",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": { "index": 3 },
+        "metallicRoughnessTexture": { "index": 5 }
+      },
+      "normalTexture": { "index": 4 }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "tripod_uv",
+      "primitives": [
+        {
+          "attributes": { "NORMAL": 3, "POSITION": 2, "TEXCOORD_0": 4 },
+          "mode": 4,
+          "material": 1,
+          "indices": 0
+        }
+      ]
+    },
+    {
+      "name": "camera_uv",
+      "primitives": [
+        {
+          "attributes": { "NORMAL": 6, "POSITION": 5, "TEXCOORD_0": 7 },
+          "mode": 4,
+          "material": 0,
+          "indices": 1
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "camera",
+      "rotation": [0, -0.7071068286895752, 0, 0.7071067690849304],
+      "scale": [0.5700311064720154, 0.5700311064720154, 0.5700311064720154],
+      "mesh": 1
+    },
+    {
+      "name": "tripod",
+      "rotation": [0, -0.7071068286895752, 0, 0.7071067690849304],
+      "scale": [0.5700311064720154, 0.5700311064720154, 0.5700311064720154],
+      "mesh": 0
+    }
+  ],
+  "scenes": [{ "name": "Scene", "nodes": [0, 1] }],
+  "scene": 0
+}
