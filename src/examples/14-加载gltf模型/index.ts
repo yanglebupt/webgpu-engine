@@ -7,6 +7,8 @@ import { OrbitController, PerspectiveCamera } from "../../tools/camera";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { GUI } from "dat.gui";
 
+const base = location.href;
+
 // 配置
 const model_gltf_configs: Record<
   string,
@@ -20,21 +22,21 @@ const model_gltf_configs: Record<
   }
 > = {
   avocado: {
-    path: "/gltf/Avocado.glb",
+    path: `${base}gltf/Avocado.glb`,
     near: 0.01,
     far: 1000,
     eye: [0, 0, 0.2],
     zoomSpeed: 0.5,
   },
   cylinder_engine: {
-    path: "/gltf/2CylinderEngine.glb",
+    path: `${base}gltf/2CylinderEngine.glb`,
     near: 0.01,
     far: 1000,
     eye: [0, 0, 700],
     zoomSpeed: 70,
   },
   antique_camera: {
-    path: "/glTF-Sample-Models/2.0/AntiqueCamera/glTF-Binary/AntiqueCamera-Interleaved.glb",
+    path: `${base}glTF-Sample-Models/2.0/AntiqueCamera/glTF-Binary/AntiqueCamera-Interleaved.glb`,
     near: 0.01,
     far: 100,
     eye: [0, 10, 5],
@@ -42,7 +44,7 @@ const model_gltf_configs: Record<
     zoomSpeed: 5,
   },
   buggy: {
-    path: "/glTF-Sample-Models/2.0/Buggy/glTF-Binary/Buggy.glb",
+    path: `${base}glTF-Sample-Models/2.0/Buggy/glTF-Binary/Buggy.glb`,
     near: 0.01,
     far: 1000,
     eye: [100, 200, -0],
@@ -50,7 +52,7 @@ const model_gltf_configs: Record<
     zoomSpeed: 30,
   },
   bunny: {
-    path: "/bunny/bunny-export.obj",
+    path: `${base}bunny/bunny-export.obj`,
     near: 1,
     far: 100,
     eye: [0, 2, 5],
