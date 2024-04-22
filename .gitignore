@@ -10,7 +10,6 @@ webgpu-gltf-case-study
 src/webgl-util-3.0.2
 docs
 node_modules
-dist
 dist-ssr
 *.local
 
