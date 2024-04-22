@@ -1,0 +1,2 @@
+- 其实 Group Binding 就相当于全局变量数组，然后在 shader 中通过内置的 index 来获取对应变量即可
+- 但内置的 index 只能在 vertex shader 中获取，因此需要将结果传递到 fragment shader 中 

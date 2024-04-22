@@ -1,0 +1,2 @@
+相机的 LookAt 是先平移到 eye 位置后旋转
+场景中物体的 aim 是先旋转后平移到 position 位置

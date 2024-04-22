@@ -1,0 +1,13 @@
+canvas {
+  background-color: #333;
+  image-rendering: unset !important;
+  display: inline-block;
+  border: 1px solid #888;
+  max-width: 256px;
+  position: relative;
+}
+
+video {
+  max-width: calc(256px * 2);
+  border: 1px solid #888;
+}

@@ -1,0 +1,6 @@
+物体在世界坐标系下（可以自己定义，例如将 canvas 坐标看成是世界坐标系）
+-> modelMatrix 变换后的世界坐标系下
+-> viewMatrix 根据相机的 LookAt 将世界坐标系转到相机坐标系
+-> projectionMatrix 正交/透视投影转到 clip 空间 （vertex shader 的输出）
+-> Perspective divide （除去齐次坐标 m）转到 NDC 空间  https://carmencincotti.com/2022-11-28/from-clip-space-to-ndc-space/
+-> viewportMatrix 绘制到屏幕空间中 3D NDC to 2D screen coordinates. (fragment shader 的输入)，也就是屏幕像素点
