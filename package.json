@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "dat.gui": "^0.7.9",
-    "install": "^0.13.0",
-    "npm": "^10.6.0",
     "webgpu-utils": "^1.7.0",
     "wgpu-matrix": "^2.8.0",
     "wgsl-preprocessor": "^1.0.1"

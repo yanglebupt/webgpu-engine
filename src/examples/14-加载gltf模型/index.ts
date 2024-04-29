@@ -95,7 +95,7 @@ const model_gltf_configs: Record<
 // settings
 let changed = false;
 const settings = {
-  model_name: "sponza",
+  model_name: "buggy",
 };
 const gui = new GUI();
 gui
@@ -142,11 +142,13 @@ async function init() {
 }
 
 let renderObj = await init();
+let print = false;
 
 export async function frame() {
   if (changed) {
     renderObj = await init();
     changed = false;
+    print = false;
   }
   const { orbitController, scene, record } = renderObj;
   const canvasTexture = ctx.getCurrentTexture();
@@ -175,6 +177,9 @@ export async function frame() {
   scene.render(pass, record);
   pass.end();
   device.queue.submit([encoder.finish()]);
-  // requestAnimationFrame(frame);
-  console.log(record);
+  requestAnimationFrame(frame);
+  if (!print) {
+    console.log(record);
+    print = true;
+  }
 }
