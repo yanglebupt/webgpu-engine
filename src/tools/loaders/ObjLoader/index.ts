@@ -93,11 +93,15 @@ export class ExtendModel {
       ],
     });
     const modelMatrixBuffer = device.createBuffer({
-      size: 16 * 4,
+      size: 16 * 4 * 2,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
-    new Float32Array(modelMatrixBuffer.getMappedRange()).set(this.matrix);
+    const normalMatrix = mat4.transpose(mat4.inverse(this.matrix));
+    new Float32Array(modelMatrixBuffer.getMappedRange()).set([
+      ...this.matrix,
+      ...normalMatrix,
+    ]);
     modelMatrixBuffer.unmap();
     const bindGroup = device.createBindGroup({
       layout: bindGroupLayout,
@@ -164,7 +168,7 @@ export class ExtendModel {
   ) {
     return this.buildRenderPipeline(
       device,
-      device.createShaderModule({ code: vertex }),
+      device.createShaderModule({ code: vertex({}) }),
       device.createShaderModule({ code: fragment }),
       bindGroupLayouts,
       format,

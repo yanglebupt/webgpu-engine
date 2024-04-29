@@ -21,6 +21,13 @@ const model_gltf_configs: Record<
     zoomSpeed?: number;
   }
 > = {
+  bunny: {
+    path: `${base}bunny/bunny-export.obj`,
+    near: 1,
+    far: 100,
+    eye: [0, 2, 5],
+    target: [0, 0, 0],
+  },
   avocado: {
     path: `${base}gltf/Avocado.glb`,
     near: 0.01,
@@ -47,23 +54,48 @@ const model_gltf_configs: Record<
     path: `${base}glTF-Sample-Models/2.0/Buggy/glTF-Binary/Buggy.glb`,
     near: 0.01,
     far: 1000,
-    eye: [100, 200, -0],
+    eye: [100, 200, 0],
     target: [0, 0, 0],
     zoomSpeed: 30,
   },
-  bunny: {
-    path: `${base}bunny/bunny-export.obj`,
-    near: 1,
+  corset: {
+    path: `${base}glTF-Sample-Models/2.0/Corset/glTF-Binary/Corset.glb`,
+    near: 0.01,
+    far: 1000,
+    eye: [0.1, 0.1, 0],
+    target: [0, 0.01, 0],
+    zoomSpeed: 1,
+  },
+  damaged_helmet: {
+    path: `${base}glTF-Sample-Models/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb`,
+    near: 0.01,
     far: 100,
-    eye: [0, 2, 5],
+    eye: [0, 0, 5],
     target: [0, 0, 0],
+    zoomSpeed: 30,
+  },
+  flight_helmet: {
+    path: `${base}glTF-Sample-Models/2.0/FlightHelmet/glTF-Binary/FlightHelmet.glb`,
+    near: 0.01,
+    far: 100,
+    eye: [1, 1, 0],
+    target: [0, 0.5, 0],
+    zoomSpeed: 5,
+  },
+  sponza: {
+    path: `${base}glTF-Sample-Models/2.0/Sponza/glTF-Binary/Sponza.glb`,
+    near: 0.01,
+    far: 100,
+    eye: [5, 10, 0],
+    target: [0, 3, 0],
+    zoomSpeed: 10,
   },
 };
 
 // settings
 let changed = false;
 const settings = {
-  model_name: "bunny",
+  model_name: "sponza",
 };
 const gui = new GUI();
 gui
@@ -143,5 +175,6 @@ export async function frame() {
   scene.render(pass, record);
   pass.end();
   device.queue.submit([encoder.finish()]);
-  requestAnimationFrame(frame);
+  // requestAnimationFrame(frame);
+  console.log(record);
 }

@@ -5,11 +5,23 @@ export enum ShaderLocation {
   TANGENT = 3,
 }
 
+export const VP_NAME = "tf";
+export const M_NAME = "mtf";
+
 export const VPTransformationMatrixGroupBinding = /* wgsl */ `
 struct Transformation {
   projectionMatrix: mat4x4f,
   viewMatrix: mat4x4f,
 };
 
-@group(0) @binding(0) var<uniform> trf: Transformation;
+@group(0) @binding(0) var<uniform> ${VP_NAME}: Transformation;
+`;
+
+export const MTransformationMatrixGroupBinding = /* wgsl */ `
+struct MTransformation {
+  modelMatrix: mat4x4f,
+  normalMatrix: mat4x4f,
+};
+
+@group(1) @binding(0) var<uniform> ${M_NAME}: MTransformation;
 `;

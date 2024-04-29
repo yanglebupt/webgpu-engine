@@ -1,24 +1,41 @@
-import { ShaderLocation, VPTransformationMatrixGroupBinding } from "..";
+import {
+  MTransformationMatrixGroupBinding,
+  M_NAME,
+  ShaderLocation,
+  VPTransformationMatrixGroupBinding,
+  VP_NAME,
+} from "..";
+import { wgsl } from "wgsl-preprocessor";
+import { ShaderContext } from "../..";
 
-export default /* wgsl */ `
+export default (context: ShaderContext) => wgsl/* wgsl */ `
 struct VertexInput {
   @location(${ShaderLocation.POSITION}) position: vec4f,
   @location(${ShaderLocation.NORMAL}) normal: vec3f,
+#if ${context.useTexcoord}
+  @location(${ShaderLocation.TEXCOORD_0}) uv0: vec2f,
+#endif
 };
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) normal: vec3f,
+  @location(1) uv0: vec2f,
 };
 
 ${VPTransformationMatrixGroupBinding}
-@group(1) @binding(0) var<uniform> modelMatrix: mat4x4f;
+${MTransformationMatrixGroupBinding}
 
 @vertex
 fn main(vert: VertexInput) -> VertexOutput {
     var o: VertexOutput;
-    o.position = trf.projectionMatrix * trf.viewMatrix * modelMatrix * vert.position;
-    o.normal = (modelMatrix * vec4f(vert.normal, 0)).xyz;
+    o.position = ${VP_NAME}.projectionMatrix * ${VP_NAME}.viewMatrix * ${M_NAME}.modelMatrix * vert.position;
+    o.normal = (${M_NAME}.normalMatrix * vec4f(vert.normal, 0)).xyz;
+    #if ${context.useTexcoord}
+      o.uv0 = vert.uv0;
+    #else
+      o.uv0 = vec2f(0);
+    #endif
     return o;
 };
 

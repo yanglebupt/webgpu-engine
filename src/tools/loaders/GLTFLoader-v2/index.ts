@@ -1,8 +1,17 @@
 import { Mat4, mat4 } from "wgpu-matrix";
-import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
+import {
+  BuiltRenderPipelineOptions,
+  CreateAndSetRecord,
+  SolidColorTexture,
+} from "..";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
-import fragment from "../shaders/fragment-wgsl/display-light.wgsl?raw";
+// import fragment from "../shaders/fragment-wgsl/display-light.wgsl?raw";
 import { ShaderLocation } from "../shaders";
+import { makeShaderDataDefinitions, makeStructuredView } from "webgpu-utils";
+import fragment, {
+  M_U_NAME,
+  MaterialUniform,
+} from "../shaders/fragment-wgsl/baseColor-light.wgsl";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -140,6 +149,26 @@ export enum GLTFComponentType {
   DOUBLE = 5130,
 }
 
+export enum GLTFSamplerMagFilterType {
+  NEAREST = 9728,
+  LINEAR = 9729,
+}
+
+export enum GLTFSamplerMinFilterType {
+  NEAREST = 9728,
+  LINEAR = 9729,
+  NEAREST_MIPMAP_NEAREST = 9984,
+  LINEAR_MIPMAP_NEAREST = 9985,
+  NEAREST_MIPMAP_LINEAR = 9986,
+  LINEAR_MIPMAP_LINEAR = 9987,
+}
+
+export enum GLTFSamplerWrapType {
+  CLAMP_TO_EDGE = 33071,
+  MIRRORED_REPEAT = 33648,
+  REPEAT = 10497,
+}
+
 export enum GLTFComponentTypeSize {
   BYTE = 1,
   UNSIGNED_BYTE = 1,
@@ -216,6 +245,7 @@ export interface GLTFPrimitive {
   mode: number;
   attributes: Record<string, number>;
   indices: number;
+  material?: number;
 }
 export interface GLTFAccessor {
   bufferView: number;
@@ -231,8 +261,46 @@ export interface GLTFBufferView {
   byteStride: number;
   target: number;
 }
+
 export interface GLTFBuffer {
   byteLength: number;
+}
+
+export interface GLTFImage {
+  name: string;
+  bufferView: number;
+  mimeType: "image/png" | "image/jpeg";
+}
+export interface GLTFSampler {
+  magFilter?: number;
+  minFilter?: number;
+  wrapS?: number;
+  wrapT?: number;
+  name?: string;
+}
+export interface GLTFTexture {
+  source: number;
+  sampler?: number;
+}
+export interface GLTFMaterial {
+  name: string;
+  pbrMetallicRoughness: {
+    baseColorFactor: number[];
+    metallicFactor: number;
+    roughnessFactor: number;
+    baseColorTexture?: { index: number; texCoord?: number };
+    metallicRoughnessTexture?: { index: number; texCoord?: number };
+  };
+  normalTexture?: { index: number; texCoord?: number; scale?: number };
+  occlusionTexture?: {
+    index: number;
+    strength?: number;
+  };
+  emissiveTexture?: { index: number };
+  emissiveFactor: number[];
+  alphaCutoff?: number;
+  alphaMode: "OPAQUE" | "MASK" | "BLEND";
+  doubleSided: boolean;
 }
 
 export interface GLTFJSON {
@@ -244,6 +312,10 @@ export interface GLTFJSON {
   accessors: GLTFAccessor[];
   bufferViews: GLTFBufferView[];
   buffers: GLTFBuffer[];
+  images?: GLTFImage[];
+  samplers?: GLTFSampler[];
+  textures?: GLTFTexture[];
+  materials?: GLTFMaterial[];
 }
 
 export class GLTFLoaderV2 {
@@ -285,6 +357,8 @@ export class GLTFLoaderV2 {
       )
     ) as GLTFJSON;
 
+    console.log(json);
+
     // 解析 Binary Chunk Header
     const binaryHeader = new Uint32Array(
       buffer,
@@ -312,6 +386,33 @@ export class GLTFLoaderV2 {
       (accessor) => new GLTFAccessor(bufferViews[accessor.bufferView], accessor)
     );
 
+    const images =
+      json.images?.map(
+        (image) => new GLTFImage(image, bufferViews[image.bufferView])
+      ) ?? [];
+    const samplers =
+      json.samplers?.map((sampler) => {
+        const sam = new GLTFSampler(sampler);
+        sam.uploadSampler(device);
+        return sam;
+      }) ?? [];
+    GLTFSampler.createDefaultSampler(device);
+    const textures =
+      json.textures?.map(
+        (texture) =>
+          new GLTFTexture(
+            texture,
+            images[texture.source],
+            (texture.sampler !== undefined
+              ? samplers[texture.sampler].sampler
+              : GLTFSampler.defaultSampler)!
+          )
+      ) ?? [];
+    // 解析
+    const materials =
+      json.materials?.map((material) => new GLTFMaterial(material, textures)) ??
+      [];
+
     const meshes = json.meshes.map((mesh) => {
       const primitives = mesh.primitives.map((primitive) => {
         let topology = primitive.mode;
@@ -338,6 +439,9 @@ export class GLTFLoaderV2 {
           indices,
           topology,
           attributeAccessors,
+          primitive.material !== undefined
+            ? materials[primitive.material]
+            : undefined,
           primitive
         );
       });
@@ -364,8 +468,16 @@ export class GLTFLoaderV2 {
 
     const gltfScene = new GLTFScene(nodes, meshes, defaultScene);
 
-    bufferViews.forEach((view) => view.upload(device));
-
+    bufferViews.forEach(
+      (view) =>
+        view.flag === GLTFBufferViewFlag.BUFFER && view.uploadBuffer(device)
+    );
+    await Promise.all(
+      images?.map(async (image) => {
+        await image.view.uploadTexture(device, image);
+      }) ?? []
+    );
+    SolidColorTexture.upload(device);
     return gltfScene;
   }
 }
@@ -374,7 +486,7 @@ export class GLTFLoaderV2 {
 export type RenderOrder = RenderPipeline[];
 export interface RenderPipeline {
   pipeline: GPURenderPipeline;
-  primitives: RenderPrimitive[];
+  materialPrimitivesMap: Map<RenderNode, RenderPrimitive[]>;
 }
 export interface RenderPrimitive {
   buffers: GPUBufferAccessor[];
@@ -387,11 +499,15 @@ export interface RenderNode {
   bindGroup: GPUBindGroup;
 }
 
+export type ShaderModuleCode =
+  | string
+  | ((context: Record<string, any>) => string);
+
 export class GLTFScene {
   public renderPipelines: Map<string, RenderPipeline> = new Map();
   public record?: CreateAndSetRecord;
-  public bindGroupLayout: GPUBindGroupLayout | null = null;
-
+  public nodeBindGroupLayout: GPUBindGroupLayout | null = null;
+  public materialBindGroupLayout: GPUBindGroupLayout | null = null;
   constructor(
     public a_nodes: GLTFFlattenNode[],
     public a_meshs: GLTFMesh[],
@@ -409,8 +525,8 @@ export class GLTFScene {
   ) {
     return this.buildRenderPipeline(
       device,
-      device.createShaderModule({ code: vertex }),
-      device.createShaderModule({ code: fragment }),
+      vertex,
+      fragment,
       bindGroupLayouts,
       format,
       depthFormat,
@@ -420,8 +536,8 @@ export class GLTFScene {
 
   buildRenderPipeline(
     device: GPUDevice,
-    vertex: GPUShaderModule,
-    fragment: GPUShaderModule,
+    vertex: ShaderModuleCode,
+    fragment: ShaderModuleCode,
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
@@ -441,8 +557,8 @@ export class GLTFScene {
   // 创建 render-order
   buildRenderOrder(
     device: GPUDevice,
-    vertex: GPUShaderModule,
-    fragment: GPUShaderModule,
+    vertex: ShaderModuleCode,
+    fragment: ShaderModuleCode,
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
@@ -450,7 +566,7 @@ export class GLTFScene {
   ) {
     this.record = record;
     // new group  假设所有的 node 都使用同一个 bindGroupLayout
-    this.bindGroupLayout = device.createBindGroupLayout({
+    this.nodeBindGroupLayout = device.createBindGroupLayout({
       entries: [
         {
           binding: 0,
@@ -459,29 +575,64 @@ export class GLTFScene {
         },
       ],
     });
+    this.materialBindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
+        },
+        ...([1, 2, 3, 4, 5].map((binding) => ({
+          binding,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { viewDimension: "2d" },
+        })) as GPUBindGroupLayoutEntry[]),
+        {
+          binding: 6,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: {},
+        },
+      ],
+    });
 
     // 多个 node 可以重复用同一个 mesh (primitives, primitive)，但 bindGroup 不同
-    // 因此需要记录使用 primitive 的 node 的 bindGroup 数组
+    // 因此需要记录使用 primitive 的 node 的 bindGroup 数组  1 对 多
     const primitiveNodesMap: Map<string, RenderNode[]> = new Map();
-    const bindGroupLayoutCache: Map<string, number> = new Map();
     this.a_nodes.forEach((a_node) => {
-      // bindGroupLayout 也需要缓存，如果其也有可能不同，会导致不同的 pipeline，这里暂时不考虑了
-      const { bindGroup } = a_node.makeNodeBindGroup(device);
+      // bindGroupLayout 也需要缓存，因为其也有可能不同，会导致不同的 pipeline，这里暂时不考虑了
+      const bindGroup = a_node.makeBindGroup(device, this.nodeBindGroupLayout!);
       record && record.bindGroupCount++;
       const renderNode = { bindGroup, groupIndex: bindGroupLayouts.length };
       a_node.a_mesh.primitives.forEach((primitive) => {
         const primitiveNodesKey = JSON.stringify(primitive);
-        const primitiveNodes = primitiveNodesMap.get(primitiveNodesKey) ?? [];
+        let primitiveNodes = primitiveNodesMap.get(primitiveNodesKey);
+        if (!primitiveNodes) {
+          primitiveNodes = [];
+          primitiveNodesMap.set(primitiveNodesKey, primitiveNodes);
+        }
         primitiveNodes.push(renderNode);
-        primitiveNodesMap.set(primitiveNodesKey, primitiveNodes);
       });
     });
 
+    // 防止重复 makeBindGroup
+    const materialCache = new Map<string, RenderNode>();
     // 注意这里直接遍历所有 mesh，而不是从 node 开始，因为不同 node 会用同一个 mesh（在上一步遍历已经包括了），导致重复
     this.a_meshs.forEach((a_mesh) => {
       a_mesh.a_primitives.forEach((a_primitive) => {
         const { gpuBuffers, indices, pipelineCacheKey, vertexCount } =
           a_primitive.makeBuffers();
+        const materialKey = JSON.stringify(a_primitive.a_material?.__material);
+        let material = materialCache.get(materialKey);
+        if (!material) {
+          material = {
+            bindGroup: a_primitive.makeBindGroup(
+              device,
+              this.materialBindGroupLayout!
+            )!,
+            groupIndex: bindGroupLayouts.length + 1,
+          };
+          materialCache.set(materialKey, material);
+        }
         // 多个 primitive 可以重复用同一个 pipeline，但 buffers 不同，因此我们需要记录
         let renderPipeline = this.renderPipelines.get(pipelineCacheKey);
         if (!renderPipeline) {
@@ -490,17 +641,28 @@ export class GLTFScene {
             device,
             vertex,
             fragment,
-            [...bindGroupLayouts, this.bindGroupLayout!],
+            [
+              ...bindGroupLayouts,
+              this.nodeBindGroupLayout!,
+              this.materialBindGroupLayout!,
+            ],
             format,
             depthFormat
           );
           renderPipeline = {
             pipeline,
-            primitives: [],
+            // 多个 primitive 可以共用同一个 material，因此需要记录使用 material 的 primitive  1 对 多
+            materialPrimitivesMap: new Map<RenderNode, RenderPrimitive[]>(),
           };
           if (create && record) record.pipelineCount++;
+          this.renderPipelines.set(pipelineCacheKey, renderPipeline);
         }
-        renderPipeline!.primitives.push({
+        let primitives = renderPipeline.materialPrimitivesMap.get(material);
+        if (!primitives) {
+          primitives = [];
+          renderPipeline.materialPrimitivesMap.set(material, primitives);
+        }
+        primitives.push({
           buffers: gpuBuffers,
           indices,
           vertexCount,
@@ -508,7 +670,6 @@ export class GLTFScene {
             primitiveNodesMap.get(JSON.stringify(a_primitive.__primitive)) ??
             [],
         });
-        this.renderPipelines.set(pipelineCacheKey, renderPipeline!);
       });
     });
   }
@@ -518,35 +679,39 @@ export class GLTFScene {
     this.renderPipelines.forEach((renderPipeline) => {
       renderPass.setPipeline(renderPipeline.pipeline);
       this.record && this.record.pipelineSets++;
-      renderPipeline.primitives.forEach((primitive) => {
-        primitive.buffers.forEach(({ accessor, offset }, idx) => {
-          this.record && this.record.bufferSets++;
-          renderPass.setVertexBuffer(
-            idx,
-            accessor.view.gpuBuffer,
-            offset,
-            accessor.byteLength
-          );
-        });
-        const { indices, vertexCount } = primitive;
-        if (indices) {
-          this.record && this.record.bufferSets++;
-          renderPass.setIndexBuffer(
-            indices.view.gpuBuffer!,
-            indices.vertexType,
-            indices.byteOffset,
-            indices.byteLength
-          );
-        }
-        primitive.nodes.forEach(({ groupIndex, bindGroup }) => {
-          this.record && this.record.bindGroupSets++;
-          renderPass.setBindGroup(groupIndex, bindGroup);
+      renderPipeline.materialPrimitivesMap.forEach((primitives, material) => {
+        renderPass.setBindGroup(material.groupIndex, material.bindGroup);
+        this.record && this.record.bindGroupSets++;
+        primitives.forEach((primitive) => {
+          primitive.buffers.forEach(({ accessor, offset }, idx) => {
+            this.record && this.record.bufferSets++;
+            renderPass.setVertexBuffer(
+              idx,
+              accessor.view.gpuBuffer,
+              offset,
+              accessor.byteLength
+            );
+          });
+          const { indices, vertexCount } = primitive;
           if (indices) {
-            renderPass.drawIndexed(indices.count);
-          } else {
-            renderPass.draw(vertexCount);
+            this.record && this.record.bufferSets++;
+            renderPass.setIndexBuffer(
+              indices.view.gpuBuffer!,
+              indices.vertexType,
+              indices.byteOffset,
+              indices.byteLength
+            );
           }
-          this.record && this.record.drawCount++;
+          primitive.nodes.forEach(({ groupIndex, bindGroup }) => {
+            this.record && this.record.bindGroupSets++;
+            renderPass.setBindGroup(groupIndex, bindGroup);
+            if (indices) {
+              renderPass.drawIndexed(indices.count);
+            } else {
+              renderPass.draw(vertexCount);
+            }
+            this.record && this.record.drawCount++;
+          });
         });
       });
     });
@@ -559,7 +724,6 @@ export class GLTFFlattenNode implements FlattenNode {
   matrix: Mat4;
   mesh: number;
   camera: number;
-  bindGroupLayout: GPUBindGroupLayout | null = null;
   bindGroup: GPUBindGroup | null = null;
   constructor(public a_mesh: GLTFMesh, node: FlattenNode) {
     this.name = node.name;
@@ -568,29 +732,23 @@ export class GLTFFlattenNode implements FlattenNode {
     this.matrix = node.matrix;
   }
 
-  makeNodeBindGroup(device: GPUDevice) {
+  makeBindGroup(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout) {
     const modelMatrixBuffer = device.createBuffer({
-      size: 16 * 4,
+      size: 16 * 4 * 2,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
-    new Float32Array(modelMatrixBuffer.getMappedRange()).set(this.matrix);
+    const normalMatrix = mat4.transpose(mat4.inverse(this.matrix));
+    new Float32Array(modelMatrixBuffer.getMappedRange()).set([
+      ...this.matrix,
+      ...normalMatrix,
+    ]);
     modelMatrixBuffer.unmap();
-    // new group
-    this.bindGroupLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-      ],
-    });
     this.bindGroup = device.createBindGroup({
-      layout: this.bindGroupLayout,
+      layout: bindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: modelMatrixBuffer } }],
     });
-    return { bindGroup: this.bindGroup, bindGroupLayout: this.bindGroup };
+    return this.bindGroup;
   }
 }
 
@@ -602,12 +760,28 @@ export class GLTFMesh {
 }
 
 export const PipelineCache: Map<string, GPURenderPipeline> = new Map();
+export const ShaderModuleCache: Map<string, GPUShaderModule> = new Map();
+export function getShaderModuleFromCache(
+  device: GPUDevice,
+  args: Record<string, any>,
+  code: ShaderModuleCode
+) {
+  const key = JSON.stringify(args);
+  let module = ShaderModuleCache.get(key);
+  if (!module) {
+    module = device.createShaderModule({
+      code: typeof code === "string" ? code : code(args),
+    });
+    ShaderModuleCache.set(key, module);
+  }
+  return module;
+}
 // 从缓存中获取 pipeline
 export function getPipelineFromCache(
   args: Record<string, any>,
   device: GPUDevice,
-  vertex: GPUShaderModule,
-  fragment: GPUShaderModule,
+  vertex: ShaderModuleCode,
+  fragment: ShaderModuleCode,
   bindGroupLayouts: GPUBindGroupLayout[],
   format: GPUTextureFormat,
   depthFormat: GPUTextureFormat = "depth24plus"
@@ -615,20 +789,37 @@ export function getPipelineFromCache(
   const key = JSON.stringify(args);
   let pipeline = PipelineCache.get(key);
   if (pipeline) return { pipeline, create: false };
+  let blend;
+  switch (args.alphaMode) {
+    case "BLEND":
+      blend = {
+        color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+        alpha: { srcFactor: "one", dstFactor: "one" },
+      } as GPUBlendState;
+      break;
+  }
   pipeline = device.createRenderPipeline({
     layout: device.createPipelineLayout({ bindGroupLayouts }),
     vertex: {
-      module: vertex,
+      module: getShaderModuleFromCache(
+        device,
+        args.shaderContext.vertex,
+        vertex
+      ),
       entryPoint: "main",
       buffers: args.bufferLayout,
     },
     fragment: {
-      module: fragment,
+      module: getShaderModuleFromCache(
+        device,
+        args.shaderContext.fragment,
+        fragment
+      ),
       entryPoint: "main",
-      targets: [{ format }],
+      targets: [{ format, blend }],
     },
     primitive: {
-      cullMode: "back",
+      cullMode: args.doubleSided ? "none" : "back",
       ...args.primitive,
     },
     depthStencil: {
@@ -655,10 +846,13 @@ export class GLTFPrimitive {
     public a_indices: GLTFAccessor | null,
     public topology: GLTFRenderMode,
     public attributeAccessors: AttributeAccessor[],
+    public a_material: GLTFMaterial | undefined,
     public __primitive: GLTFPrimitive
   ) {
     Object.assign(this, this.__primitive);
-    this.a_indices?.view.addUsage(GPUBufferUsage.INDEX);
+    this.a_indices?.view.addUsage(
+      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+    );
     this.setupPrimitive();
   }
 
@@ -670,10 +864,20 @@ export class GLTFPrimitive {
         primitive.stripIndexFormat = this.a_indices!.vertexType;
     }
     const bufferLayout = this.bufferLayout;
+    const alphaMode = this.a_material?.alphaMode ?? "OPAQUE";
     return {
       pipelineCacheKey: JSON.stringify({
         primitive,
         bufferLayout,
+        alphaMode,
+        doubleSided: this.a_material?.doubleSided ?? false,
+        shaderContext: {
+          vertex: {
+            useTexcoord: "TEXCOORD_0" in this.attributes,
+            useAlphaCutoff: alphaMode == "MASK",
+          },
+          fragment: {},
+        },
       }),
       vertexCount: this.vertexCount,
       gpuBuffers: this.gpuBuffers,
@@ -692,7 +896,7 @@ export class GLTFPrimitive {
       .sort((a, b) => a.accessor.byteOffset - b.accessor.byteOffset)
       .forEach(({ accessor, name, shaderLocation }) => {
         if (name == "POSITION") this.vertexCount = accessor.count;
-        accessor.view.addUsage(GPUBufferUsage.VERTEX);
+        accessor.view.addUsage(GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
         let buffer = bufferLayout.get(accessor.bufferView);
         let gpuBuffer;
         let separate =
@@ -759,6 +963,43 @@ export class GLTFPrimitive {
       (buffer) => gpuBuffers.get(buffer)!
     );
   }
+
+  // 设置 material，TODO 有些 primitive 可以不存在 material
+  makeBindGroup(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout) {
+    if (!this.a_material) return;
+    const defs = makeShaderDataDefinitions(MaterialUniform);
+    const uniformValue = makeStructuredView(defs.uniforms[M_U_NAME]);
+    // 传递值
+    uniformValue.set(this.a_material.uniformValue);
+    const uniformBuffer = device.createBuffer({
+      size: uniformValue.arrayBuffer.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(uniformBuffer, 0, uniformValue.arrayBuffer);
+
+    const textures = this.a_material.textures;
+    const bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } }, // uniform 值
+        // 贴图
+        ...(textures.map((texture, index) => {
+          const texFn = texture.a_image.view.texture;
+          const tex = typeof texFn === "function" ? texFn()! : texFn!;
+          return {
+            binding: index + 1,
+            resource: tex.createView(),
+          };
+        }) as GPUBindGroupEntry[]),
+        // 采样器
+        {
+          binding: textures.length + 1,
+          resource: this.a_material.samplers[0],
+        },
+      ],
+    });
+    return bindGroup;
+  }
 }
 
 // gltf buffers ：创建对应的 Uint8Array
@@ -769,11 +1010,17 @@ export class GLTFBuffer extends Uint8Array {
   }
 }
 
+export enum GLTFBufferViewFlag {
+  BUFFER,
+  TEXTURE,
+}
 // gltf buffer view
 export class GLTFBufferView {
   viewBuffer: Uint8Array;
   usage: number;
   gpuBuffer: GPUBuffer | null = null;
+  texture: GPUTexture | null = null;
+  flag: GLTFBufferViewFlag = GLTFBufferViewFlag.BUFFER;
   constructor(buffer: GLTFBuffer, view: GLTFBufferView) {
     Object.assign(this, {
       byteStride: 0,
@@ -784,15 +1031,35 @@ export class GLTFBufferView {
       this.byteOffset,
       this.byteOffset + this.byteLength
     );
-    this.usage = GPUBufferUsage.COPY_DST;
+    this.usage = 0;
+  }
+
+  setFlag(flag: GLTFBufferViewFlag) {
+    this.flag = flag;
   }
 
   addUsage(usage: number) {
     this.usage = this.usage | usage;
   }
 
+  async uploadTexture(device: GPUDevice, image: GLTFImage) {
+    const blob = new Blob([this.viewBuffer], { type: image.mimeType });
+    const bitmap = await createImageBitmap(blob);
+    const descriptor = {
+      size: [bitmap.width, bitmap.height],
+      format: "rgba8unorm",
+      usage: this.usage,
+    } as GPUTextureDescriptor;
+    this.texture?.destroy();
+    this.texture = device.createTexture(descriptor);
+    device.queue.copyExternalImageToTexture(
+      { source: bitmap },
+      { texture: this.texture },
+      descriptor.size
+    );
+  }
   // 最小的 bufferView，不再进行切分了
-  upload(device: GPUDevice) {
+  uploadBuffer(device: GPUDevice) {
     this.gpuBuffer?.destroy();
     this.gpuBuffer = device.createBuffer({
       size: alignTo(this.viewBuffer.byteLength, 4),
@@ -847,5 +1114,137 @@ export class GLTFAccessor {
     return componentNums > 1
       ? `${componentVertexFormat}x${componentNums}`
       : componentVertexFormat;
+  }
+}
+
+export class GLTFImage {
+  constructor(image: GLTFImage, public view: GLTFBufferView) {
+    Object.assign(this, image);
+    view.setFlag(GLTFBufferViewFlag.TEXTURE);
+    view.addUsage(
+      GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT
+    );
+  }
+}
+export class GLTFSampler {
+  sampler: GPUSampler | null = null;
+  static defaultSampler: GPUSampler | null = null;
+  constructor(sampler: GLTFSampler) {
+    Object.assign(this, sampler);
+  }
+
+  static createDefaultSampler(device: GPUDevice) {
+    if (!GLTFSampler.defaultSampler) {
+      GLTFSampler.defaultSampler = device.createSampler({
+        addressModeU: "repeat",
+        addressModeV: "repeat",
+        minFilter: "linear",
+        magFilter: "linear",
+        mipmapFilter: "linear",
+      });
+    }
+  }
+
+  uploadSampler(device: GPUDevice) {
+    GLTFSampler.createDefaultSampler(device);
+    const descriptor: GPUSamplerDescriptor = {
+      addressModeU: this.addressModeForWrap(this.wrapS),
+      addressModeV: this.addressModeForWrap(this.wrapT),
+    };
+    // WebGPU's default min/mag/mipmap filtering is nearest, se we only have to override it if we
+    // want linear filtering for some aspect.
+    if (!this.magFilter || this.magFilter === GLTFSamplerMagFilterType.LINEAR) {
+      descriptor.magFilter = "linear";
+    }
+    switch (this.minFilter) {
+      case WebGLRenderingContext.NEAREST:
+        break;
+      case WebGLRenderingContext.LINEAR:
+      case WebGLRenderingContext.LINEAR_MIPMAP_NEAREST:
+        descriptor.minFilter = "linear";
+        break;
+      case WebGLRenderingContext.NEAREST_MIPMAP_LINEAR:
+        descriptor.mipmapFilter = "linear";
+        break;
+      case WebGLRenderingContext.LINEAR_MIPMAP_LINEAR:
+      default:
+        descriptor.minFilter = "linear";
+        descriptor.mipmapFilter = "linear";
+        break;
+    }
+    this.sampler = device.createSampler(descriptor);
+  }
+
+  addressModeForWrap(wrap?: GLTFSamplerWrapType) {
+    switch (wrap) {
+      case GLTFSamplerWrapType.CLAMP_TO_EDGE:
+        return "clamp-to-edge";
+      case GLTFSamplerWrapType.MIRRORED_REPEAT:
+        return "mirror-repeat";
+      default:
+        return "repeat";
+    }
+  }
+}
+
+export class GLTFTexture {
+  constructor(
+    texture: GLTFTexture,
+    public a_image: GLTFImage | { view: { texture: () => GPUTexture | null } },
+    public a_sampler: GPUSampler
+  ) {
+    Object.assign(this, texture);
+  }
+}
+export class GLTFMaterial {
+  uniformValue: Record<string, number | number[]>;
+  textures: GLTFTexture[];
+  samplers: GPUSampler[] = [];
+  constructor(public __material: GLTFMaterial, textures: GLTFTexture[]) {
+    Object.assign(this, __material);
+    // 值
+    this.uniformValue = {
+      baseColorFactor: this.pbrMetallicRoughness.baseColorFactor ?? [
+        1, 1, 1, 1,
+      ],
+      alphaCutoff: this.alphaCutoff ?? 0.5,
+    };
+    // 贴图和采样器
+    this.textures = [
+      {
+        a: this.pbrMetallicRoughness.baseColorTexture,
+        d: () => SolidColorTexture.opaqueWhiteTexture,
+      },
+      {
+        a: this.normalTexture,
+        d: () => SolidColorTexture.defaultNormalTexture,
+      },
+      {
+        a: this.pbrMetallicRoughness.metallicRoughnessTexture,
+        d: () => SolidColorTexture.opaqueWhiteTexture,
+      },
+      {
+        a: this.emissiveTexture,
+        d: () => SolidColorTexture.transparentBlackTexture,
+      },
+      {
+        a: this.occlusionTexture,
+        d: () => SolidColorTexture.transparentBlackTexture,
+      },
+    ].map(({ a, d }) => {
+      const res =
+        a?.index !== undefined
+          ? textures[a?.index]
+          : new GLTFTexture(
+              { source: -1, sampler: -1 } as any,
+              { view: { texture: d } },
+              GLTFSampler.defaultSampler!
+            );
+      if (!this.samplers.includes(res.a_sampler))
+        this.samplers.push(res.a_sampler);
+      return res;
+    });
   }
 }

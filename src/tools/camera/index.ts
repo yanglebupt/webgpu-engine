@@ -6,7 +6,10 @@ import {
   makeShaderDataDefinitions,
   makeStructuredView,
 } from "webgpu-utils";
-import { VPTransformationMatrixGroupBinding } from "../loaders/shaders";
+import {
+  VPTransformationMatrixGroupBinding,
+  VP_NAME,
+} from "../loaders/shaders";
 
 export interface Camera {
   eye: Vec3;
@@ -38,7 +41,7 @@ export class PerspectiveCamera implements Camera {
     this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, zNear, zFar);
 
     const defs = makeShaderDataDefinitions(VPTransformationMatrixGroupBinding);
-    this.trfView = makeStructuredView(defs.uniforms.trf);
+    this.trfView = makeStructuredView(defs.uniforms[VP_NAME]);
     this.trfView.set({
       projectionMatrix: this.matrix,
     });
