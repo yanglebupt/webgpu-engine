@@ -1,4 +1,8 @@
-import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
+import {
+  BuiltRenderPipelineOptions,
+  CreateAndSetRecord,
+  ShaderModuleCode,
+} from "..";
 import { normalize, rand } from "../../math";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import fragment from "../shaders/fragment-wgsl/display-light.wgsl?raw";
@@ -14,6 +18,7 @@ export class ExtendModel {
   public indices: number[] = [];
   public vertexData: number[] = [];
   public matrix: Mat4 = mat4.identity();
+  public record?: CreateAndSetRecord;
   renderPipeline: GPURenderPipeline | null = null;
   renderBuffers: {
     vertexBuffer: GPUBuffer;
@@ -88,13 +93,13 @@ export class ExtendModel {
         {
           binding: 0,
           visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
+          buffer: { type: "read-only-storage" },
         },
       ],
     });
     const modelMatrixBuffer = device.createBuffer({
       size: 16 * 4 * 2,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
     const normalMatrix = mat4.transpose(mat4.inverse(this.matrix));
@@ -112,8 +117,8 @@ export class ExtendModel {
 
   buildRenderPipeline(
     device: GPUDevice,
-    vertex: GPUShaderModule,
-    fragment: GPUShaderModule,
+    vertex: ShaderModuleCode,
+    fragment: ShaderModuleCode,
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
@@ -136,12 +141,14 @@ export class ExtendModel {
         ],
       }),
       vertex: {
-        module: vertex,
+        module: device.createShaderModule({
+          code: typeof vertex === "string" ? vertex : vertex({}),
+        }),
         entryPoint: "main",
         buffers: this.renderBuffers.vertexDescriptor,
       },
       fragment: {
-        module: fragment,
+        module: device.createShaderModule({ code: fragment as string }),
         entryPoint: "main",
         targets: [{ format }],
       },
@@ -157,6 +164,7 @@ export class ExtendModel {
     });
 
     record && record.pipelineCount++;
+    this.record = record;
   }
 
   buildInRenderPipeline(
@@ -168,8 +176,8 @@ export class ExtendModel {
   ) {
     return this.buildRenderPipeline(
       device,
-      device.createShaderModule({ code: vertex({}) }),
-      device.createShaderModule({ code: fragment }),
+      vertex,
+      fragment,
       bindGroupLayouts,
       format,
       depthFormat,
@@ -177,8 +185,10 @@ export class ExtendModel {
     );
   }
 
-  render(renderPass: GPURenderPassEncoder, record?: CreateAndSetRecord) {
+  render(renderPass: GPURenderPassEncoder, _record?: CreateAndSetRecord) {
     if (!this.renderPipeline) return;
+    const record = _record ?? new CreateAndSetRecord();
+    if (this.record) Object.assign(record, this.record);
     const { vertexBuffer, indicesBuffer, indexFormat } = this.renderBuffers!;
     const { groupIndex, bindGroup } = this.renderBindGroup!;
     renderPass.setPipeline(this.renderPipeline!);
@@ -190,6 +200,7 @@ export class ExtendModel {
     record && record.bindGroupSets++;
     renderPass.drawIndexed(this.indices.length);
     record && record.drawCount++;
+    return record;
   }
 }
 

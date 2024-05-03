@@ -1,3 +1,7 @@
+export type ShaderModuleCode =
+  | string
+  | ((context: Record<string, any>) => string);
+
 export class CreateAndSetRecord {
   // 创建了多少个 pipeline
   public pipelineCount: number = 0;

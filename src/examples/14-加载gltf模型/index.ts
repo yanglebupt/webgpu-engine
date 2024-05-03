@@ -138,19 +138,19 @@ async function init() {
     record,
   });
 
-  return { record, orbitController, scene };
+  return { orbitController, scene };
 }
 
-let renderObj = await init();
 let print = false;
+let renderObj = await init();
 
 export async function frame() {
   if (changed) {
     renderObj = await init();
-    changed = false;
     print = false;
+    changed = false;
   }
-  const { orbitController, scene, record } = renderObj;
+  const { orbitController, scene } = renderObj;
   const canvasTexture = ctx.getCurrentTexture();
   const depthTexture = StaticTextureUtils.createDepthTexture(device, [
     canvasTexture.width,
@@ -174,7 +174,7 @@ export async function frame() {
   });
   // 渲染
   orbitController.render(pass, device);
-  scene.render(pass, record);
+  const record = scene.render(pass);
   pass.end();
   device.queue.submit([encoder.finish()]);
   requestAnimationFrame(frame);

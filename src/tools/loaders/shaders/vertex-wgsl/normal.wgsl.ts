@@ -1,6 +1,6 @@
 import {
   MTransformationMatrixGroupBinding,
-  M_NAME,
+  M_INSTANCE_NAME,
   ShaderLocation,
   VPTransformationMatrixGroupBinding,
   VP_NAME,
@@ -27,10 +27,14 @@ ${VPTransformationMatrixGroupBinding}
 ${MTransformationMatrixGroupBinding}
 
 @vertex
-fn main(vert: VertexInput) -> VertexOutput {
+fn main(
+  vert: VertexInput, 
+  @builtin(instance_index) instanceIndex : u32
+) -> VertexOutput {
     var o: VertexOutput;
-    o.position = ${VP_NAME}.projectionMatrix * ${VP_NAME}.viewMatrix * ${M_NAME}.modelMatrix * vert.position;
-    o.normal = (${M_NAME}.normalMatrix * vec4f(vert.normal, 0)).xyz;
+    let modelTransform = ${M_INSTANCE_NAME}[instanceIndex];
+    o.position = ${VP_NAME}.projectionMatrix * ${VP_NAME}.viewMatrix * modelTransform.modelMatrix * vert.position;
+    o.normal = (modelTransform.normalMatrix * vec4f(vert.normal, 0)).xyz;
     #if ${context.useTexcoord}
       o.uv0 = vert.uv0;
     #else

@@ -6,7 +6,7 @@ export enum ShaderLocation {
 }
 
 export const VP_NAME = "tf";
-export const M_NAME = "mtf";
+export const M_INSTANCE_NAME = "mtfInstances";
 
 export const VPTransformationMatrixGroupBinding = /* wgsl */ `
 struct Transformation {
@@ -23,5 +23,5 @@ struct MTransformation {
   normalMatrix: mat4x4f,
 };
 
-@group(1) @binding(0) var<uniform> ${M_NAME}: MTransformation;
+@group(1) @binding(0) var<storage> ${M_INSTANCE_NAME}: array<MTransformation>;
 `;

@@ -12,6 +12,7 @@ docs
 node_modules
 dist-ssr
 *.local
+pbr-shader
 
 # Editor directories and files
 .vscode/*
