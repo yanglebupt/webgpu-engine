@@ -26,51 +26,61 @@ export interface BuiltRenderPipelineOptions {
 
 export type ShaderContext = Record<string, any>;
 
-export function createSolidColorTexture(
-  device: GPUDevice,
-  r: number,
-  g: number,
-  b: number,
-  a: number
-) {
-  const data = new Uint8Array([r * 255, g * 255, b * 255, a * 255]);
-  const texture = device.createTexture({
-    size: { width: 1, height: 1 },
-    format: "rgba8unorm",
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-  device.queue.writeTexture({ texture }, data, {}, { width: 1, height: 1 });
-  return texture;
+export class SolidColorTextureView {
+  public texture: GPUTexture | null = null;
+  public format: GPUTextureFormat | null = null;
+  constructor(public color: { r: number; g: number; b: number; a: number }) {}
+  setFormat(format: GPUTextureFormat) {
+    this.format = format;
+  }
+  async uploadTexture(device: GPUDevice) {
+    if (!this.format) throw new Error("Can't upload texture without format");
+    const data = new Uint8Array([
+      this.color.r * 255,
+      this.color.g * 255,
+      this.color.b * 255,
+      this.color.a * 255,
+    ]);
+    this.texture?.destroy();
+    this.texture = device.createTexture({
+      size: [1, 1],
+      format: this.format!,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.writeTexture(
+      { texture: this.texture },
+      data,
+      {},
+      { width: 1, height: 1 }
+    );
+  }
 }
 
 export class SolidColorTexture {
-  static opaqueWhiteTexture: GPUTexture | null = null;
-  static transparentBlackTexture: GPUTexture | null = null;
-  static defaultNormalTexture: GPUTexture | null = null;
+  static opaqueWhiteTexture = new SolidColorTextureView({
+    r: 1,
+    g: 1,
+    b: 1,
+    a: 1,
+  });
+  static transparentBlackTexture = new SolidColorTextureView({
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0,
+  });
+  static defaultNormalTexture = new SolidColorTextureView({
+    r: 0.5,
+    g: 0.5,
+    b: 1,
+    a: 1,
+  });
   static upload(device: GPUDevice) {
-    if (!SolidColorTexture.opaqueWhiteTexture)
-      SolidColorTexture.opaqueWhiteTexture = createSolidColorTexture(
-        device,
-        1,
-        1,
-        1,
-        1
-      );
-    if (!SolidColorTexture.transparentBlackTexture)
-      SolidColorTexture.transparentBlackTexture = createSolidColorTexture(
-        device,
-        0,
-        0,
-        0,
-        0
-      );
-    if (!SolidColorTexture.defaultNormalTexture)
-      SolidColorTexture.defaultNormalTexture = createSolidColorTexture(
-        device,
-        0.5,
-        0.5,
-        1,
-        1
-      );
+    SolidColorTexture.defaultNormalTexture.uploadTexture(device);
+    SolidColorTexture.transparentBlackTexture.uploadTexture(device);
+    SolidColorTexture.opaqueWhiteTexture.uploadTexture(device);
   }
 }
