@@ -23,9 +23,11 @@ https://www.willusher.io/archive https://toji.dev/webgpu-gltf-case-study/
 - `tools/math.ts` 实现一些常用的数学函数
 - `tools/index.ts` 核心实现了 `checkWebGPUSupported` 和 `createCanvas` 来初始化 GPUDevice 和 canvas
 
-使用案例见 <a href="./src/examples/14-加载gltf模型/index.ts">14-加载gltf模型</a>，我们已经做了一些必要的优化，例如更改 `render-order` 来减少管线的切换和重复的资源绑定
+使用案例见 <a href="./src/examples/14-加载gltf模型/index.ts">14-加载gltf模型</a>，我们已经做了一些必要的优化，例如缓存以减少重复创建管线和资源、更改 `render-order` 来减少管线的切换和重复的资源绑定，具体优化手段见 <a href="https://qwuzvjx4mo.feishu.cn/docx/DO7zdbtozoyp9mxyeLuc6GoDnnb">>>></a>，最终渲染流程和如下代码一致
 
 ![](./public/assets/gltf-render-order.png)
+
+## GLTF 模型加载用法
 
 ```typescript
 import { checkWebGPUSupported, createCanvas } from "../../tools";
@@ -51,9 +53,6 @@ const config = {
 const { device, format } = await checkWebGPUSupported();
 const { ctx, canvas, aspect } = createCanvas(500, 500, { device, format });
 
-// 设置记录
-const record = new CreateAndSetRecord();
-
 const bindGroupLayouts = [];
 
 // 创建相机
@@ -75,7 +74,7 @@ const loader = new GLTFLoaderV2();
 const scene = await loader.load(device, config.path, {
   bindGroupLayouts,
   format,
-  record,
+  record: new CreateAndSetRecord(),
 });
 
 
@@ -103,17 +102,24 @@ export async function frame() {
   });
   // 渲染
   orbitController.render(pass, device);
-  scene.render(pass, record);
+  const record = scene.render(pass);
   pass.end();
   device.queue.submit([encoder.finish()]);
   requestAnimationFrame(frame);
+  console.log(record);
 }
 ```
+
+## 加载效果截图
+
+项目地址：https://yanglebupt.github.io/webgpu-learn/ 由于默认加载线上模型，请求模型并下载需要一定时间，一旦请求完成，模型放入浏览器缓存后，渲染很快的
 
 ![](./public/assets/gltf-loader.png)
 
 # 后续进度
 
+- 加入进度条
+- 基于 Render Equation 和 BRDF 完善 PBR 渲染和 IBL env map (离线，Pre-filtered)
 - 完善 gltf 中的骨骼动画
 - 开发一个基于 WebGPU 的小引擎（其实从加载 GLTF 这个案例已经可以看到雏形了），主要功能如下
   - 立方体的几何形状，其他形状可以进行自定义
