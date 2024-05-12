@@ -4,10 +4,13 @@
   margin-left: 10px;
 }
 
+.dg.ac {
+  z-index: 1;
+}
+
 #canvas-parent {
   display: inline-block;
   position: relative;
-  z-index: -1;
 }
 
 .loading-bar {
