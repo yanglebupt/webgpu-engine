@@ -5,6 +5,12 @@ export enum ShaderLocation {
   TANGENT = 3,
 }
 
+export type ShaderModuleCode =
+  | string
+  | ((context: Record<string, any>) => string);
+
+export type ShaderContext = Record<string, any>;
+
 export const VP_NAME = "tf";
 export const M_INSTANCE_NAME = "mtfInstances";
 
@@ -12,6 +18,7 @@ export const VPTransformationMatrixGroupBinding = /* wgsl */ `
 struct Transformation {
   projectionMatrix: mat4x4f,
   viewMatrix: mat4x4f,
+  cameraPosition: vec3f,
 };
 
 @group(0) @binding(0) var<uniform> ${VP_NAME}: Transformation;

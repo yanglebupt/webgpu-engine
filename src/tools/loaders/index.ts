@@ -1,7 +1,3 @@
-export type ShaderModuleCode =
-  | string
-  | ((context: Record<string, any>) => string);
-
 export class CreateAndSetRecord {
   // 创建了多少个 pipeline
   public pipelineCount: number = 0;
@@ -20,11 +16,10 @@ export class CreateAndSetRecord {
 export interface BuiltRenderPipelineOptions {
   bindGroupLayouts: GPUBindGroupLayout[];
   format: GPUTextureFormat;
+  mips?: boolean;
   depthFormat?: GPUTextureFormat;
   record?: CreateAndSetRecord;
 }
-
-export type ShaderContext = Record<string, any>;
 
 export class SolidColorTextureView {
   public texture: GPUTexture | null = null;
@@ -34,7 +29,9 @@ export class SolidColorTextureView {
     this.format = format;
   }
   async uploadTexture(device: GPUDevice) {
-    if (!this.format) throw new Error("Can't upload texture without format");
+    if (!this.format) {
+      return;
+    }
     const data = new Uint8Array([
       this.color.r * 255,
       this.color.g * 255,
@@ -78,9 +75,11 @@ export class SolidColorTexture {
     b: 1,
     a: 1,
   });
-  static upload(device: GPUDevice) {
-    SolidColorTexture.defaultNormalTexture.uploadTexture(device);
-    SolidColorTexture.transparentBlackTexture.uploadTexture(device);
-    SolidColorTexture.opaqueWhiteTexture.uploadTexture(device);
+  static async upload(device: GPUDevice) {
+    return Promise.all([
+      SolidColorTexture.defaultNormalTexture.uploadTexture(device),
+      SolidColorTexture.transparentBlackTexture.uploadTexture(device),
+      SolidColorTexture.opaqueWhiteTexture.uploadTexture(device),
+    ]);
   }
 }

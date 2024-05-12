@@ -1,4 +1,4 @@
-import { Mat4, Vec3, mat4 } from "wgpu-matrix";
+import { Mat4, Vec3, mat4, vec3 } from "wgpu-matrix";
 import ArcballCamera from "./arcball";
 import Controller from "./controller";
 import {
@@ -6,10 +6,7 @@ import {
   makeShaderDataDefinitions,
   makeStructuredView,
 } from "webgpu-utils";
-import {
-  VPTransformationMatrixGroupBinding,
-  VP_NAME,
-} from "../loaders/shaders";
+import { VPTransformationMatrixGroupBinding, VP_NAME } from "../shaders";
 
 export interface Camera {
   eye: Vec3;
@@ -137,8 +134,11 @@ export class OrbitController {
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
+    const viewMatrix = this.arcballController.camera;
+    const cameraPosition = vec3.getTranslation(mat4.inverse(viewMatrix));
     this.camera.trfView.set({
-      viewMatrix: this.arcballController.camera,
+      viewMatrix,
+      cameraPosition,
     });
     device.queue.writeBuffer(
       this.camera.trfBuffer,

@@ -1,12 +1,8 @@
-import {
-  BuiltRenderPipelineOptions,
-  CreateAndSetRecord,
-  ShaderModuleCode,
-} from "..";
+import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
 import { normalize, rand } from "../../math";
-import vertex from "../shaders/vertex-wgsl/normal.wgsl";
-import fragment from "../shaders/fragment-wgsl/display-light.wgsl?raw";
-import { ShaderLocation } from "../shaders";
+import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
+import fragment from "../../shaders/fragment-wgsl/display-light.wgsl?raw";
+import { ShaderLocation, ShaderModuleCode } from "../../shaders";
 import { Mat4, mat4 } from "wgpu-matrix";
 
 export class ExtendModel {

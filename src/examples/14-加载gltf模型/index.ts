@@ -42,6 +42,13 @@ const model_gltf_configs: Record<
     eye: [0, 0, 700],
     zoomSpeed: 70,
   },
+  stone_demon: {
+    path: `${base}gltf/stone_demon.glb`,
+    near: 0.01,
+    far: 1000,
+    eye: [0, 3, 3],
+    zoomSpeed: 5,
+  },
   antique_camera: {
     path: `${base}glTF-Sample-Models/2.0/AntiqueCamera/glTF-Binary/AntiqueCamera-Interleaved.glb`,
     near: 0.01,
@@ -95,12 +102,14 @@ const model_gltf_configs: Record<
 // settings
 let changed = false;
 const settings = {
-  model_name: "buggy",
+  model_name: "stone_demon",
+  mips: false,
 };
 const gui = new GUI();
 gui
   .add(settings, "model_name", Object.keys(model_gltf_configs))
   .onChange(() => (changed = true));
+gui.add(settings, "mips").onChange(() => (changed = true));
 
 // 初始化 GPUDevice 和 canvas
 const { device, format } = await checkWebGPUSupported();
@@ -136,6 +145,7 @@ async function init() {
     bindGroupLayouts,
     format,
     record,
+    mips: settings.mips,
   });
 
   return { orbitController, scene };

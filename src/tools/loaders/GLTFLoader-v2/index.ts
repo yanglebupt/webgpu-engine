@@ -2,17 +2,20 @@ import { Mat4, mat4 } from "wgpu-matrix";
 import {
   BuiltRenderPipelineOptions,
   CreateAndSetRecord,
-  ShaderModuleCode,
   SolidColorTexture,
   SolidColorTextureView,
 } from "..";
-import vertex from "../shaders/vertex-wgsl/normal.wgsl";
-import { ShaderLocation } from "../shaders";
-import { makeShaderDataDefinitions, makeStructuredView } from "webgpu-utils";
+import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
+import { ShaderLocation, ShaderModuleCode } from "../../shaders";
+import {
+  makeShaderDataDefinitions,
+  makeStructuredView,
+  createTextureFromSource,
+} from "webgpu-utils";
 import fragment, {
   M_U_NAME,
   MaterialUniform,
-} from "../shaders/fragment-wgsl/pbr-light.wgsl";
+} from "../../shaders/fragment-wgsl/pbr-light.wgsl";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -325,9 +328,14 @@ export class GLTFLoaderV2 {
     filename: string,
     builtRenderPipelineOptions: BuiltRenderPipelineOptions
   ) {
-    const { bindGroupLayouts, format, depthFormat, record } =
-      builtRenderPipelineOptions;
-    const gltfScene = await this.parse(device, format, filename);
+    const {
+      bindGroupLayouts,
+      format,
+      mips = false,
+      depthFormat,
+      record,
+    } = builtRenderPipelineOptions;
+    const gltfScene = await this.parse(device, filename, format, mips);
     // 创建渲染管线
     gltfScene.buildInRenderPipeline(
       device,
@@ -338,7 +346,12 @@ export class GLTFLoaderV2 {
     );
     return gltfScene;
   }
-  async parse(device: GPUDevice, format: GPUTextureFormat, filename: string) {
+  async parse(
+    device: GPUDevice,
+    filename: string,
+    format: GPUTextureFormat,
+    mips?: boolean
+  ) {
     const buffer = await (await fetch(filename)).arrayBuffer();
     // 解析 Header 和 Json Chunk Header
     const header = new Uint32Array(buffer, 0, 5);
@@ -476,10 +489,10 @@ export class GLTFLoaderV2 {
     );
     await Promise.all(
       images?.map(async (image) => {
-        await image.view.uploadTexture(device, image);
+        await image.view.uploadTexture(device, image, mips);
       }) ?? []
     );
-    SolidColorTexture.upload(device);
+    await SolidColorTexture.upload(device);
     return gltfScene;
   }
 }
@@ -1147,22 +1160,12 @@ export class GLTFBufferView {
     this.usage = this.usage | usage;
   }
 
-  async uploadTexture(device: GPUDevice, image: GLTFImage) {
+  async uploadTexture(device: GPUDevice, image: GLTFImage, mips?: boolean) {
     if (!this.format) throw new Error("Can't upload texture without format");
     const blob = new Blob([this.viewBuffer], { type: image.mimeType });
     const bitmap = await createImageBitmap(blob);
-    const descriptor = {
-      size: [bitmap.width, bitmap.height],
-      format: this.format!,
-      usage: this.usage,
-    } as GPUTextureDescriptor;
     this.texture?.destroy();
-    this.texture = device.createTexture(descriptor);
-    device.queue.copyExternalImageToTexture(
-      { source: bitmap },
-      { texture: this.texture },
-      descriptor.size
-    );
+    this.texture = createTextureFromSource(device, bitmap, { mips: mips });
   }
   // 最小的 bufferView，不再进行切分了
   uploadBuffer(device: GPUDevice) {
@@ -1305,7 +1308,7 @@ export class GLTFTexture {
   }
 }
 export class GLTFMaterial {
-  uniformValue: Record<string, number | number[]>;
+  uniformValue: Record<string, number | number[] | boolean>;
   textures: GLTFTexture[];
   samplers: GPUSampler[] = [];
   constructor(
@@ -1319,7 +1322,13 @@ export class GLTFMaterial {
       baseColorFactor: this.pbrMetallicRoughness.baseColorFactor ?? [
         1, 1, 1, 1,
       ],
+      metallicFactor: this.pbrMetallicRoughness.metallicFactor ?? 1,
+      roughnessFactor: this.pbrMetallicRoughness.roughnessFactor ?? 1,
+      emissiveFactor: this.emissiveFactor ?? [0, 0, 0],
+      normalScale: this.normalTexture?.scale ?? 1,
+      occlusionStrength: this.occlusionTexture?.strength ?? 1,
       alphaCutoff: this.alphaCutoff ?? 0.5,
+      applyNormalMap: this.normalTexture !== undefined ? 1 : 0,
     };
     const preferredFormat = format.split("-")[0];
     // 贴图和采样器
