@@ -1,4 +1,6 @@
 import {
+  ShaderDataDefinitions,
+  StructuredView,
   getSizeAndAlignmentOfUnsizedArrayElement,
   makeShaderDataDefinitions,
   makeStructuredView,
@@ -14,15 +16,23 @@ export interface Light {
   pos?: Vec3;
 }
 export class Light {
-  static defs = makeShaderDataDefinitions(LightGroupBinding);
-  static elementByteSize = getSizeAndAlignmentOfUnsizedArrayElement(
-    Light.defs.storages[L_NAME]
-  ).size;
-  static view = (nums: number) =>
-    makeStructuredView(
-      Light.defs.storages[L_NAME],
-      new ArrayBuffer(nums * Light.elementByteSize)
-    );
+  static defs: ShaderDataDefinitions;
+  static view: (nums: number) => StructuredView;
+  static elementByteSize: number;
+
+  static {
+    try {
+      Light.defs = makeShaderDataDefinitions(LightGroupBinding);
+      Light.elementByteSize = getSizeAndAlignmentOfUnsizedArrayElement(
+        Light.defs.storages[L_NAME]
+      ).size;
+      Light.view = (nums: number) =>
+        makeStructuredView(
+          Light.defs.storages[L_NAME],
+          new ArrayBuffer(nums * Light.elementByteSize)
+        );
+    } catch (error) {}
+  }
 }
 
 export enum LightType {

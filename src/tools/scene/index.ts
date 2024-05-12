@@ -1,5 +1,6 @@
 import { Camera, OrbitController } from "../camera";
 import { Light } from "../lights";
+import { CreateAndSetRecord } from "../loaders";
 import { GLTFScene } from "../loaders/GLTFLoader-v2";
 import { ExtendModel } from "../loaders/ObjLoader";
 import { vec3 } from "wgpu-matrix";
@@ -95,7 +96,10 @@ export class Scene {
     );
   }
 
-  render(renderPass: GPURenderPassEncoder) {
+  render(
+    renderPass: GPURenderPassEncoder,
+    print?: (record: CreateAndSetRecord) => void
+  ) {
     if (!this.mainCamera) return;
     if (!this.bindGroup || this.needUpdateBindGroup) {
       this.bindGroup = this.makeBindGroup();
@@ -104,6 +108,6 @@ export class Scene {
     this.updates.forEach((update) => update.update());
     this.setBuffers();
     renderPass.setBindGroup(0, this.bindGroup);
-    this.children.forEach((child) => child.render(renderPass));
+    this.children.forEach((child) => child.render(renderPass, print));
   }
 }

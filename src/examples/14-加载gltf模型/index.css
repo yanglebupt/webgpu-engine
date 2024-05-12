@@ -1,0 +1,50 @@
+.record {
+  display: inline-block;
+  vertical-align: top;
+  margin-left: 10px;
+}
+
+#canvas-parent {
+  display: inline-block;
+  position: relative;
+  z-index: -1;
+}
+
+.loading-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(30, 31, 29, 0.637);
+  display: none;
+}
+
+.loading-bar.show {
+  display: block;
+}
+
+.bar-container {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.bar {
+  height: 20px;
+  background-color: rgb(255, 140, 140);
+}
+
+.progress {
+  height: 100%;
+  width: 0;
+  background-color: red;
+  transition-timing-function: linear;
+  transition-property: width;
+}
+
+.tip {
+  color: white;
+}

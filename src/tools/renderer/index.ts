@@ -4,6 +4,7 @@ import {
   checkWebGPUSupported,
   createCanvas,
 } from "..";
+import { CreateAndSetRecord } from "../loaders";
 import { Scene } from "../scene";
 import { StaticTextureUtils } from "../utils";
 
@@ -19,22 +20,29 @@ export interface WebGPURenderer {
   aspect: number;
 }
 export class WebGPURenderer {
-  constructor() {}
+  public className?: string;
+  public parentID?: string;
+  constructor(options?: { className?: string; parentID?: string }) {
+    this.className = options?.className;
+    this.parentID = options?.parentID;
+  }
 
   // 初始化 GPUDevice 和 canvas
-  async checkSupport(onError?: (error: Error) => void) {
-    try {
-      const gpuSupport = await checkWebGPUSupported();
-      const { device, format } = gpuSupport;
-      const canvasReturn = createCanvas(500, 500, { device, format });
-      Object.assign(this, { ...gpuSupport, ...canvasReturn });
-    } catch (error) {
-      onError && onError(error as Error);
-    }
+  async checkSupport() {
+    const gpuSupport = await checkWebGPUSupported();
+    const { device, format } = gpuSupport;
+    const canvasReturn = createCanvas(
+      500,
+      500,
+      { device, format },
+      this.className,
+      this.parentID
+    );
+    Object.assign(this, { ...gpuSupport, ...canvasReturn });
     return this;
   }
 
-  render(scene: Scene) {
+  render(scene: Scene, print?: (record: CreateAndSetRecord) => void) {
     const canvasTexture = this.ctx.getCurrentTexture();
     const depthTexture = StaticTextureUtils.createDepthTexture(this.device, [
       canvasTexture.width,
@@ -56,7 +64,7 @@ export class WebGPURenderer {
         view: depthTexture.createView(),
       },
     });
-    scene.render(pass);
+    scene.render(pass, print);
     pass.end();
     this.device.queue.submit([encoder.finish()]);
   }

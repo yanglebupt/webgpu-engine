@@ -102,7 +102,6 @@ async function frame() {
 
 # 后续进度
 
-- 加入进度条
 - 完成 IBL env map (离线，Pre-filtered)
 - 完善 gltf 中的骨骼动画
 - 开发一个基于 WebGPU 的小引擎（其实从加载 GLTF 这个案例已经可以看到雏形了），主要功能如下

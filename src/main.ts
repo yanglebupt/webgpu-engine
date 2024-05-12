@@ -13,6 +13,7 @@
 // import { frame } from "./examples/11-计算 shader 的高级用法";
 // import { frame } from "./examples/12-skybox 的原理";
 // import { frame } from "./examples/13-加载外部obj模型";
-import { frame } from "./examples/14-加载gltf模型";
+// requestAnimationFrame(frame);
 
+import { frame } from "./examples/14-加载gltf模型";
 requestAnimationFrame(frame);

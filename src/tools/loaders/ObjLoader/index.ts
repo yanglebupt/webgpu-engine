@@ -181,7 +181,11 @@ export class ExtendModel {
     );
   }
 
-  render(renderPass: GPURenderPassEncoder, _record?: CreateAndSetRecord) {
+  render(
+    renderPass: GPURenderPassEncoder,
+    print?: (record: CreateAndSetRecord) => void,
+    _record?: CreateAndSetRecord
+  ) {
     if (!this.renderPipeline) return;
     const record = _record ?? new CreateAndSetRecord();
     if (this.record) Object.assign(record, this.record);
@@ -196,6 +200,7 @@ export class ExtendModel {
     record && record.bindGroupSets++;
     renderPass.drawIndexed(this.indices.length);
     record && record.drawCount++;
+    print && print(record);
     return record;
   }
 }

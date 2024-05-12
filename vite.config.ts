@@ -5,4 +5,7 @@ import topLevelAwait from "vite-plugin-top-level-await";
 export default defineConfig({
   plugins: [topLevelAwait()],
   base: "./",
+  server: {
+    host: "0.0.0.0",
+  },
 });

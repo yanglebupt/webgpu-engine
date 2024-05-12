@@ -1,13 +1,13 @@
-import { checkWebGPUSupported, createCanvas } from "../../tools";
 import { degToRad } from "../../tools/math";
-import { StaticTextureUtils } from "../../tools/utils";
 import { GLTFLoaderV2 } from "../../tools/loaders/GLTFLoader-v2";
 import { OrbitController, PerspectiveCamera } from "../../tools/camera";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { GUI } from "dat.gui";
 import { Scene } from "../../tools/scene";
-import { DirectionLight, PointLight } from "../../tools/lights";
+import { DirectionLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
+import { CreateAndSetRecord } from "../../tools/loaders";
+import { LoaderBarDomElement } from "./loaderBar";
 
 const base = location.href;
 
@@ -102,10 +102,10 @@ const model_gltf_configs: Record<
 };
 
 // settings
-let changed = false;
+let changed = true;
 const settings = {
   model_name: "stone_demon",
-  mips: false,
+  mips: true,
   flux: 10.0,
 };
 const gui = new GUI();
@@ -115,12 +115,22 @@ gui
 gui.add(settings, "mips").onChange(() => (changed = true));
 gui.add(settings, "flux", 1, 40);
 
+const parentDom = document.createElement("div");
+parentDom.id = "canvas-parent";
+document.body.appendChild(parentDom);
+const loadingBar = new LoaderBarDomElement(parentDom);
+
 // 新建一个 WebGPURenderer
-const renderer = await new WebGPURenderer().checkSupport(({ message }) => {
-  const div = document.createElement("div");
-  div.innerText = message;
-  document.body.appendChild(div);
-});
+const renderer = (await new WebGPURenderer({
+  parentID: parentDom.id,
+})
+  .checkSupport()
+  .catch(({ message }) => {
+    const div = document.createElement("div");
+    div.innerText = message;
+    document.body.appendChild(div);
+    throw new Error(message);
+  })) as WebGPURenderer;
 
 // 创建灯光
 const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
@@ -150,23 +160,42 @@ async function init() {
   const loader = config.path.endsWith(".obj")
     ? new ObjLoader()
     : new GLTFLoaderV2();
+  loadingBar.showLoading();
   const model = await loader.load(renderer.device, config.path, {
     bindGroupLayouts: [scene.bindGroupLayout],
     format: renderer.format,
     mips: settings.mips,
+    record: new CreateAndSetRecord(),
+    onProgress: (name: string, percentage: number) => {
+      loadingBar.setPercentage(percentage, name);
+    },
   });
+  loadingBar.hiddenLoading();
   scene.add(model);
   return scene;
 }
 
-let scene = await init();
+let recordDom = document.createElement("div");
+recordDom.className = "record";
+document.body.appendChild(recordDom);
 
+let scene: Scene;
 export async function frame() {
   if (changed) {
     scene = await init();
-    changed = false;
   }
   light.flux = settings.flux;
-  renderer.render(scene);
+  renderer?.render(scene, (record) => {
+    if (changed)
+      recordDom.innerHTML = `
+<div>pipelineCount: ${record.pipelineCount}</div>
+<div>pipelineSets: ${record.pipelineSets}</div>
+<div>bindGroupCount: ${record.bindGroupCount}</div>
+<div>bindGroupSets: ${record.bindGroupSets}</div>
+<div>bufferSets: ${record.bufferSets}</div>
+<div>drawCount: ${record.drawCount}</div>
+`;
+  });
+  changed = false;
   requestAnimationFrame(frame);
 }

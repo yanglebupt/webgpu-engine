@@ -334,15 +334,23 @@ export class GLTFLoaderV2 {
       mips = false,
       depthFormat,
       record,
+      onProgress,
     } = builtRenderPipelineOptions;
-    const gltfScene = await this.parse(device, filename, format, mips);
+    const gltfScene = await this.parse(
+      device,
+      filename,
+      format,
+      mips,
+      onProgress
+    );
     // 创建渲染管线
     gltfScene.buildInRenderPipeline(
       device,
       bindGroupLayouts,
       format,
       depthFormat,
-      record
+      record,
+      onProgress
     );
     return gltfScene;
   }
@@ -350,8 +358,10 @@ export class GLTFLoaderV2 {
     device: GPUDevice,
     filename: string,
     format: GPUTextureFormat,
-    mips?: boolean
+    mips?: boolean,
+    onProgress?: (name: string, percentage: number) => void
   ) {
+    onProgress && onProgress("downloading", 0.1);
     const buffer = await (await fetch(filename)).arrayBuffer();
     // 解析 Header 和 Json Chunk Header
     const header = new Uint32Array(buffer, 0, 5);
@@ -428,7 +438,10 @@ export class GLTFLoaderV2 {
         (material) => new GLTFMaterial(material, textures, format)
       ) ?? [];
 
-    const meshes = json.meshes.map((mesh) => {
+    onProgress && onProgress("parse mesh", 0.3);
+    const meshes = json.meshes.map((mesh, idx) => {
+      onProgress &&
+        onProgress("parse mesh", 0.3 + ((idx + 1) / json.meshes.length) * 0.1);
       const primitives = mesh.primitives.map((primitive) => {
         let topology = primitive.mode;
         if (topology === undefined) topology = GLTFRenderMode.TRIANGLES;
@@ -464,11 +477,17 @@ export class GLTFLoaderV2 {
       return new GLTFMesh(primitives, mesh);
     });
 
+    onProgress && onProgress("parse nodes", 0.4);
     // 渲染第一个或者默认场景
     // tracked a big list of node transforms and meshes
     const defaultScene = json.scenes[json.scene ?? 0];
     const nodes = defaultScene.nodes
-      .map((nodeIdx) => {
+      .map((nodeIdx, idx) => {
+        onProgress &&
+          onProgress(
+            "parse nodes",
+            0.4 + ((idx + 1) / defaultScene.nodes.length) * 0.1
+          );
         const node = json.nodes[nodeIdx];
         const flattenedNodeMesh = flattenTree(
           node,
@@ -487,8 +506,14 @@ export class GLTFLoaderV2 {
       (view) =>
         view.flag === GLTFBufferViewFlag.BUFFER && view.uploadBuffer(device)
     );
+    onProgress && onProgress("upload textures", 0.5);
     await Promise.all(
-      images?.map(async (image) => {
+      images?.map(async (image, idx) => {
+        onProgress &&
+          onProgress(
+            "upload textures",
+            0.5 + ((idx + 1) / images.length) * 0.1
+          );
         await image.view.uploadTexture(device, image, mips);
       }) ?? []
     );
@@ -548,7 +573,8 @@ export class GLTFScene {
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
-    record?: CreateAndSetRecord
+    record?: CreateAndSetRecord,
+    onProgress?: (name: string, percentage: number) => void
   ) {
     return this.buildRenderPipeline(
       device,
@@ -557,7 +583,8 @@ export class GLTFScene {
       bindGroupLayouts,
       format,
       depthFormat,
-      record
+      record,
+      onProgress
     );
   }
 
@@ -568,7 +595,8 @@ export class GLTFScene {
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
-    record?: CreateAndSetRecord
+    record?: CreateAndSetRecord,
+    onProgress?: (name: string, percentage: number) => void
   ) {
     return this.buildRenderOrder(
       device,
@@ -577,7 +605,8 @@ export class GLTFScene {
       bindGroupLayouts,
       format,
       depthFormat,
-      record
+      record,
+      onProgress
     );
   }
 
@@ -589,7 +618,8 @@ export class GLTFScene {
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat = "depth24plus",
-    record?: CreateAndSetRecord
+    record?: CreateAndSetRecord,
+    onProgress?: (name: string, percentage: number) => void
   ) {
     this.record = record;
     // new group  假设所有的 node 都使用同一个 bindGroupLayout
@@ -632,11 +662,17 @@ export class GLTFScene {
       arrayBuffer: new Float32Array(),
     };
 
-    this.a_nodes.forEach((a_node) => {
+    onProgress && onProgress("parse primitives", 0.6);
+    this.a_nodes.forEach((a_node, idx) => {
       const renderNode: RenderNodeMatrix = {
         matrix: a_node.matrix,
         normalMatrix: a_node.calcNormalMatrix(),
       };
+      onProgress &&
+        onProgress(
+          "parse primitives",
+          0.6 + ((idx + 1) / this.a_nodes.length) * 0.2
+        );
       a_node.a_mesh.primitives.forEach((primitive) => {
         const primitiveNodesKey = JSON.stringify(primitive);
         let primitiveNodes = primitiveNodesMap.get(primitiveNodesKey);
@@ -649,6 +685,7 @@ export class GLTFScene {
       });
     });
 
+    onProgress && onProgress("make instance", 0.8);
     // 将所有 primitive - node，创建一个大的 instance bind group
     const instanceBuffer = device.createBuffer({
       size: 16 * 2 * 4 * primitiveInstances.total,
@@ -668,7 +705,7 @@ export class GLTFScene {
     // 防止重复 makeBindGroup
     const materialCache = new Map<string, RenderNode>();
     // 注意这里直接遍历所有 mesh，而不是从 node 开始，因为不同 node 会用同一个 mesh（在上一步遍历已经包括了），导致重复
-    this.a_meshs.forEach((a_mesh) => {
+    this.a_meshs.forEach((a_mesh, idx) => {
       a_mesh.a_primitives.forEach((a_primitive) => {
         const { gpuBuffers, indices, pipelineCacheKey, vertexCount } =
           a_primitive.makeBuffers();
@@ -723,9 +760,12 @@ export class GLTFScene {
             primitiveInstances
           ),
         });
+
+        const p = 0.8 + ((idx + 1) / this.a_meshs.length) * 0.2;
+        const text = p >= 1 ? "done" : "make buffer pipeline bindGroup pair";
+        onProgress && onProgress(text, p);
       });
     });
-
     instanceBuffer.unmap();
   }
 
@@ -783,7 +823,11 @@ export class GLTFScene {
   }
 
   // 以 render-order 进行渲染
-  render(renderPass: GPURenderPassEncoder, _record?: CreateAndSetRecord) {
+  render(
+    renderPass: GPURenderPassEncoder,
+    print?: (record: CreateAndSetRecord) => void,
+    _record?: CreateAndSetRecord
+  ) {
     const record = _record ?? new CreateAndSetRecord();
     if (this.record) Object.assign(record, this.record);
     record && record.bindGroupSets++;
@@ -825,6 +869,7 @@ export class GLTFScene {
         });
       });
     });
+    print && print(record);
     return record;
   }
 }

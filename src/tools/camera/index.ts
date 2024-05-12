@@ -1,6 +1,7 @@
 import { Mat4, Vec3, mat4, vec3 } from "wgpu-matrix";
 import ArcballCamera from "./arcball";
 import {
+  ShaderDataDefinitions,
   StructuredView,
   makeShaderDataDefinitions,
   makeStructuredView,
@@ -20,8 +21,16 @@ export interface Camera {
 }
 
 export class Camera {
-  static defs = makeShaderDataDefinitions(VPTransformationMatrixGroupBinding);
-  static view = makeStructuredView(Camera.defs.uniforms[VP_NAME]);
+  static defs: ShaderDataDefinitions;
+  static view: StructuredView;
+  static {
+    try {
+      Camera.defs = makeShaderDataDefinitions(
+        VPTransformationMatrixGroupBinding
+      );
+      Camera.view = makeStructuredView(Camera.defs.uniforms[VP_NAME]);
+    } catch (error) {}
+  }
   constructor() {
     this.viewMatrix = mat4.identity();
     this.cameraPosition = vec3.zero();
