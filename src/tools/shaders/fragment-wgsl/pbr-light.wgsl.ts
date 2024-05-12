@@ -1,5 +1,5 @@
 import { wgsl } from "wgsl-preprocessor";
-import { ShaderContext } from "..";
+import { L_NAME, LightGroupBinding, ShaderContext } from "..";
 
 export const M_U_NAME = "material";
 export const MaterialUniform = /* wgsl */ `
@@ -18,9 +18,6 @@ struct Material {
 `;
 
 export default (context: ShaderContext) => wgsl/* wgsl */ `
-const lightDir = vec3f(-1, -1, -1);
-const lightColor = vec4f(1.0);
-const flux = 10.0;
 
 const PI = 3.141592653589793;
 const RECIPROCAL_PI = 0.3183098861837907;
@@ -29,6 +26,7 @@ const ESP = 0.001;
 
 const reflectance = 0.5;
 
+${LightGroupBinding}
 ${MaterialUniform}
 // 贴图
 @group(2) @binding(1) var baseColorTexture: texture_2d<f32>;
@@ -119,15 +117,25 @@ struct Light {
   ir: vec3f,
 };
 
-fn irradiance_direction_light(flux: f32, lightDir: vec3f, lightColor: vec4f, pos: vec3f, n: vec3f) -> Light {
+fn irradiance_direction_light(in_light: InputLight, n: vec3f) -> Light {
   var light: Light;
-  let l = normalize(-lightDir);  // towards light
-  let irradiance = max(dot(l,n),0.0) * flux;
+  let l = normalize(-in_light.dir);  // towards light
+  let irradiance = max(dot(l,n),0.0) * in_light.flux;
   light.dir = l;
-  light.ir = irradiance * rgb2lin(lightColor.rgb);
+  light.ir = irradiance * rgb2lin(in_light.color.rgb);
   return light;
 }
 
+fn irradiance_point_light(in_light: InputLight, pos: vec3f, n: vec3f) -> Light {
+  var light: Light;
+  let lightDir = in_light.pos - pos;
+  let r = length(lightDir);
+  let l = normalize(lightDir);
+  let irradiance = max(dot(l,n),0.0) * in_light.flux / (4.0 * PI * pow(r, 2.0));
+  light.dir = l;
+  light.ir = irradiance * rgb2lin(in_light.color.rgb);
+  return light;
+}
 
 fn radiance_render(brdf: vec3f, ir: vec3f) -> vec3f {
   return brdf * ir;
@@ -153,11 +161,25 @@ fn main(
 
   var radiance = rgb2lin(emissiveColor);  
   ///////////////////////////////////////////
-  let light = irradiance_direction_light(flux, lightDir, lightColor, vec3(0.0), n); 
-  let brdf = cook_torrance_MicrofacetBRDF(light.dir, n, v, rgb2lin(baseColor.rgb),
-                        roughness, metallic, reflectance);
-                        
-  radiance += radiance_render(brdf, light.ir);
+  for(var i=0u; i<arrayLength(&${L_NAME}); i++){
+    let in_light = ${L_NAME}[i];
+    var out_light: Light;
+    switch in_light.ltype {
+      case 1: {
+        out_light = irradiance_direction_light(in_light, n); 
+      }
+      case 2: {
+        out_light = irradiance_point_light(in_light, pos, n); 
+      }
+      default: {
+        
+      }
+    }
+    let brdf = cook_torrance_MicrofacetBRDF(out_light.dir, n, v, rgb2lin(baseColor.rgb),
+                          roughness, metallic, reflectance);
+                          
+    radiance += radiance_render(brdf, out_light.ir);
+  }
   ///////////////////////////////////////////
   let rgb = lin2rgb(radiance);
 

@@ -1,89 +1,57 @@
 import { Mat4, Vec3, mat4, vec3 } from "wgpu-matrix";
 import ArcballCamera from "./arcball";
-import Controller from "./controller";
 import {
   StructuredView,
   makeShaderDataDefinitions,
   makeStructuredView,
 } from "webgpu-utils";
 import { VPTransformationMatrixGroupBinding, VP_NAME } from "../shaders";
+import { UpdateController } from "../scene";
+import Controller from "./controller";
 
 export interface Camera {
   eye: Vec3;
   target: Vec3;
   up: Vec3;
   matrix: Mat4;
-  trfView: StructuredView;
-  trfBuffer: GPUBuffer;
+  viewMatrix: Mat4;
+  cameraPosition: Vec3;
   render(renderPass: GPURenderPassEncoder): void;
 }
 
-export class PerspectiveCamera implements Camera {
+export class Camera {
+  static defs = makeShaderDataDefinitions(VPTransformationMatrixGroupBinding);
+  static view = makeStructuredView(Camera.defs.uniforms[VP_NAME]);
+  constructor() {
+    this.viewMatrix = mat4.identity();
+    this.cameraPosition = vec3.zero();
+  }
+}
+export class PerspectiveCamera extends Camera {
   eye: Vec3 = [0, 0, 0];
   target: Vec3 = [0, 0, 0];
   up: Vec3 = [0, 1, 0];
-  matrix: Mat4;
-  trfView: StructuredView;
-  trfBuffer: GPUBuffer;
-  bindGrouplayout: GPUBindGroupLayout;
-  bindGroup: GPUBindGroup;
 
   constructor(
-    device: GPUDevice,
     fieldOfViewYInRadians: number,
     aspect: number,
     zNear: number,
     zFar: number
   ) {
+    super();
     this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, zNear, zFar);
-
-    const defs = makeShaderDataDefinitions(VPTransformationMatrixGroupBinding);
-    this.trfView = makeStructuredView(defs.uniforms[VP_NAME]);
-    this.trfView.set({
-      projectionMatrix: this.matrix,
-    });
-
-    const { bindGrouplayout, bindGroup, trfBuffer } =
-      this.makeBindGroup(device);
-    this.bindGroup = bindGroup;
-    this.bindGrouplayout = bindGrouplayout;
-    this.trfBuffer = trfBuffer;
-  }
-
-  makeBindGroup(device: GPUDevice) {
-    const trfBuffer = device.createBuffer({
-      size: this.trfView.arrayBuffer.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-    const bindGrouplayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "uniform" },
-        },
-      ],
-    });
-    const bindGroup = device.createBindGroup({
-      layout: bindGrouplayout,
-      entries: [{ binding: 0, resource: { buffer: trfBuffer } }],
-    });
-
-    return { bindGroup, bindGrouplayout, trfBuffer };
   }
 
   lookAt(eye: Vec3, target?: Vec3, up?: Vec3) {
     this.eye = eye;
     if (target) this.target = target;
     if (up) this.up = up;
-  }
-
-  render(renderPass: GPURenderPassEncoder) {
-    renderPass.setBindGroup(0, this.bindGroup);
+    this.viewMatrix = mat4.lookAt(this.eye, this.target, this.up);
+    this.cameraPosition = vec3.getTranslation(mat4.inverse(this.viewMatrix));
   }
 }
 
-export class OrbitController {
+export class OrbitController extends UpdateController {
   arcballController: ArcballCamera;
   id = "orbitcontroller-tips";
   constructor(
@@ -91,14 +59,13 @@ export class OrbitController {
     public canvas: HTMLCanvasElement,
     public options?: { zoomSpeed?: number }
   ) {
+    super();
     this.arcballController = this.createArcBallCamera(
       camera.eye,
       camera.target,
       camera.up
     );
   }
-
-  update() {}
 
   createArcBallCamera(eye: Vec3, target: Vec3, up: Vec3) {
     const width = this.canvas.clientWidth;
@@ -133,18 +100,10 @@ export class OrbitController {
     return orbitController;
   }
 
-  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
-    const viewMatrix = this.arcballController.camera;
-    const cameraPosition = vec3.getTranslation(mat4.inverse(viewMatrix));
-    this.camera.trfView.set({
-      viewMatrix,
-      cameraPosition,
-    });
-    device.queue.writeBuffer(
-      this.camera.trfBuffer,
-      0,
-      this.camera.trfView.arrayBuffer
+  update() {
+    this.camera.viewMatrix = this.arcballController.camera;
+    this.camera.cameraPosition = vec3.getTranslation(
+      mat4.inverse(this.camera.viewMatrix)
     );
-    this.camera.render(renderPass);
   }
 }

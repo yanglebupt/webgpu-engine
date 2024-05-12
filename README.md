@@ -19,11 +19,14 @@ https://www.willusher.io/archive https://toji.dev/webgpu-gltf-case-study/
 
 - `tools/camera` 实现了 `PerspectiveCamera` 和 `OrbitController` 类来设置相机及其控制器，可以使用鼠标操作来控制相机视角。Controls: left-click to drag, right-click to pan, scroll to zoom.
 - `tools/loaders` 实现了 `ObjLoader` 和 `GLTFLoaderV2` 分别来加载 `obj` 和 `gltf` 模型
-- `tools/utils.ts` 实现了 `StaticTextureUtils` 来创建 `createDepthTexture` 和 `createMultiSampleTexture`
+- `tools/scene` 实现了场景管理，可以添加相加，灯光，模型，控制器等
+- `tools/renderer` 实现了 WebGPU 渲染器，负责渲染场景
+- `tools/lights` 实现了平行光和点光源
+- `tools/utils.ts` 实现了 `StaticTextureUtils` 来创建一些特殊的贴图 `createDepthTexture` 和 `createMultiSampleTexture`
 - `tools/math.ts` 实现一些常用的数学函数
-- `tools/index.ts` 核心实现了 `checkWebGPUSupported` 和 `createCanvas` 来初始化 GPUDevice 和 canvas
+- `tools/index.ts` 实现了 `checkWebGPUSupported` 和 `createCanvas` 来初始化 GPUDevice 和 canvas
 
-使用案例见 <a href="./src/examples/14-加载gltf模型/index.ts">14-加载gltf模型</a>，我们已经做了一些必要的优化，例如缓存以减少重复创建管线和资源、更改 `render-order` 来减少管线的切换和重复的资源绑定，具体优化手段见 <a href="https://qwuzvjx4mo.feishu.cn/docx/DO7zdbtozoyp9mxyeLuc6GoDnnb">>>></a>，最终渲染流程和如下代码一致
+使用案例见 <a href="./src/examples/14-加载gltf模型/index.ts">14-加载gltf模型</a>，我们已经做了一些必要的优化，例如缓存以减少重复创建管线和资源、更改 `render-order` 来减少管线的切换和重复的资源绑定，具体优化手段见 <a href="https://qwuzvjx4mo.feishu.cn/docx/DO7zdbtozoyp9mxyeLuc6GoDnnb">>>></a>，最终 GLTF 的渲染流程和如下代码一致
 
 ![](./public/assets/gltf-render-order.png)
 
@@ -34,79 +37,60 @@ import { checkWebGPUSupported, createCanvas } from "../../tools";
 import { degToRad } from "../../tools/math";
 import { StaticTextureUtils } from "../../tools/utils";
 import { GLTFLoaderV2 } from "../../tools/loaders/GLTFLoader-v2";
-import { CreateAndSetRecord } from "../../tools/loaders";
 import { OrbitController, PerspectiveCamera } from "../../tools/camera";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
+import { GUI } from "dat.gui";
+import { Scene } from "../../tools/scene";
+import { DirectionLight } from "../../tools/lights";
+import { WebGPURenderer } from "../../tools/renderer";
+
+const base = location.href;
 
 // 配置
 const config = {
-  path: "/glTF-Sample-Models/2.0/Buggy/glTF-Binary/Buggy.glb",
+  path: `${base}glTF-Sample-Models/2.0/Sponza/glTF-Binary/Sponza.glb`,
   near: 0.01,
-  far: 1000,
-  eye: [100, 200, -0],
-  target: [0, 0, 0],
-  zoomSpeed: 30,
-}
+  far: 100,
+  eye: [5, 10, 0],
+  target: [0, 3, 0],
+  zoomSpeed: 10,
+},
 
+// 新建一个 WebGPURenderer
+const renderer = await new WebGPURenderer().checkSupport();
 
-// 初始化 GPUDevice 和 canvas
-const { device, format } = await checkWebGPUSupported();
-const { ctx, canvas, aspect } = createCanvas(500, 500, { device, format });
+// 创建场景对象
+const scene = new Scene(renderer.device);
 
-const bindGroupLayouts = [];
+// 创建灯光
+const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
+scene.add(light);
 
-// 创建相机
+// 创建相机和控制器
 const camera = new PerspectiveCamera(
-  device,
   degToRad(75),
-  aspect,
+  renderer.aspect,
   config.near,
   config.far
 );
 camera.lookAt(config.eye, config.target);
-const orbitController = new OrbitController(camera, canvas, {
+const orbitController = new OrbitController(camera, renderer.canvas, {
   zoomSpeed: config.zoomSpeed,
 });
-bindGroupLayouts.push(camera.bindGrouplayout);
+scene.add(orbitController);
 
 // 加载 gltf 模型 或者 obj 模型
-const loader = new GLTFLoaderV2();
-const scene = await loader.load(device, config.path, {
-  bindGroupLayouts,
-  format,
-  record: new CreateAndSetRecord(),
+const loader = model_name === "bunny" ? new ObjLoader() : new GLTFLoaderV2();
+const model = await loader.load(renderer.device, config.path, {
+  bindGroupLayouts: [scene.bindGroupLayout],
+  format: renderer.format,
 });
+scene.add(model);
 
-
-export async function frame() {
-  const canvasTexture = ctx.getCurrentTexture();
-  const depthTexture = StaticTextureUtils.createDepthTexture(device, [
-    canvasTexture.width,
-    canvasTexture.height,
-  ]);
-  const encoder = device.createCommandEncoder();
-  const pass = encoder.beginRenderPass({
-    colorAttachments: [
-      {
-        loadOp: "clear",
-        storeOp: "store",
-        view: canvasTexture.createView(),
-      },
-    ],
-    depthStencilAttachment: {
-      depthClearValue: 1.0,
-      depthLoadOp: "clear",
-      depthStoreOp: "store",
-      view: depthTexture.createView(),
-    },
-  });
-  // 渲染
-  orbitController.render(pass, device);
-  const record = scene.render(pass);
-  pass.end();
-  device.queue.submit([encoder.finish()]);
+// 循环运行渲染
+async function frame() {
+  renderer.render(scene);
   requestAnimationFrame(frame);
-  console.log(record);
 }
 ```
 
@@ -119,7 +103,7 @@ export async function frame() {
 # 后续进度
 
 - 加入进度条
-- 基于 Render Equation 和 BRDF 完善 PBR 渲染和 IBL env map (离线，Pre-filtered)
+- 完成 IBL env map (离线，Pre-filtered)
 - 完善 gltf 中的骨骼动画
 - 开发一个基于 WebGPU 的小引擎（其实从加载 GLTF 这个案例已经可以看到雏形了），主要功能如下
   - 立方体的几何形状，其他形状可以进行自定义

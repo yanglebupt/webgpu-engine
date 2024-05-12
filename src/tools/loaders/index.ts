@@ -19,6 +19,7 @@ export interface BuiltRenderPipelineOptions {
   mips?: boolean;
   depthFormat?: GPUTextureFormat;
   record?: CreateAndSetRecord;
+  onProgress?: (name: string, percentage: number) => void;
 }
 
 export class SolidColorTextureView {

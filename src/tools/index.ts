@@ -1,11 +1,16 @@
 import { bilinearFilter } from "./math";
-
+export interface GPUSupport {
+  gpu: GPU;
+  adapter: GPUAdapter;
+  device: GPUDevice;
+  format: GPUTextureFormat;
+}
 export async function checkWebGPUSupported(
   adapterOptions?: GPURequestAdapterOptions,
   deviceDescriptor?: GPUDeviceDescriptor & {
     requiredLimits?: Partial<GPUSupportedLimits>;
   }
-) {
+): Promise<GPUSupport> {
   const gpu = navigator.gpu;
   if (!gpu) throw new Error("Web GPU not available");
   const adapter = await gpu.requestAdapter(adapterOptions);

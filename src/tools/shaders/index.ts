@@ -13,6 +13,7 @@ export type ShaderContext = Record<string, any>;
 
 export const VP_NAME = "tf";
 export const M_INSTANCE_NAME = "mtfInstances";
+export const L_NAME = "lightCollection";
 
 export const VPTransformationMatrixGroupBinding = /* wgsl */ `
 struct Transformation {
@@ -22,6 +23,18 @@ struct Transformation {
 };
 
 @group(0) @binding(0) var<uniform> ${VP_NAME}: Transformation;
+`;
+
+export const LightGroupBinding = /* wgsl */ `
+struct InputLight {
+  dir: vec3f,
+  pos: vec3f,
+  color: vec4f,
+  flux: f32,
+  ltype: u32,
+};
+
+@group(0) @binding(1) var<storage> ${L_NAME}: array<InputLight>;
 `;
 
 export const MTransformationMatrixGroupBinding = /* wgsl */ `
