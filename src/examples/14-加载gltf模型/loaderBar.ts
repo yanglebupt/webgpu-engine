@@ -1,16 +1,5 @@
+import { waitUnitCondition } from "../../tools/common";
 import "./index.css";
-
-// 轮询直到条件成立
-export const waitUnitCondition = (gasp: number, conditionFn: () => boolean) =>
-  new Promise((resolve) => {
-    const id = setInterval(() => {
-      if (conditionFn()) {
-        clearInterval(id);
-        resolve(true);
-      }
-    }, gasp);
-  });
-
 /* 默认控件 */
 export class LoaderBarDomElement {
   static html = `
@@ -69,7 +58,10 @@ export class LoaderBarDomElement {
 
   async hiddenLoading() {
     /* 需要在页面更新后隐藏 */
-    this.nextTick(() => this.root.classList.toggle("show"));
+    this.nextTick(() => {
+      this.root.classList.toggle("show");
+      this.bar.style.setProperty("width", `0`);
+    });
   }
 
   /* 需要在页面更新后回调 */
