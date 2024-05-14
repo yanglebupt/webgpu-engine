@@ -1,0 +1,1 @@
+texture format `rgba32float` 才可以得到清晰的结果，否则很暗

@@ -166,13 +166,15 @@ fn main(
     var out_light: Light;
     switch in_light.ltype {
       case 1: {
-        out_light = irradiance_direction_light(in_light, n); 
+        out_light = irradiance_direction_light(in_light, n);
+        break; 
       }
       case 2: {
         out_light = irradiance_point_light(in_light, pos, n); 
+        break; 
       }
       default: {
-        
+        break; 
       }
     }
     let brdf = cook_torrance_MicrofacetBRDF(out_light.dir, n, v, rgb2lin(baseColor.rgb),

@@ -1,3 +1,4 @@
+import { CreateTextureOptions, getSourceSize, numMipLevels } from "./loader";
 import { bilinearFilter } from "./math";
 export interface GPUSupport {
   gpu: GPU;
@@ -35,10 +36,11 @@ export type CreateCanvasReturn = {
   height: number;
   aspect: number;
 };
+export type CreateCanvasConfig = GPUCanvasConfiguration & { scale?: boolean };
 export function createCanvas(
   width: number | string,
   height: number | string,
-  config?: GPUCanvasConfiguration,
+  config?: CreateCanvasConfig,
   className?: string,
   parentID?: string
 ): CreateCanvasReturn;
@@ -51,7 +53,7 @@ export function createCanvas(
     width: number;
     height: number;
   },
-  config?: GPUCanvasConfiguration,
+  config?: CreateCanvasConfig,
   className?: string,
   parentID?: string
 ): CreateCanvasReturn;
@@ -70,7 +72,7 @@ export function createCanvas(
         width: number;
         height: number;
       },
-  config?: GPUCanvasConfiguration,
+  config?: CreateCanvasConfig,
   className?: string,
   parentID?: string
 ) {
@@ -102,8 +104,9 @@ export function createCanvas(
   const pixel_height = show_pixel_size
     ? (height as any).height
     : canvas.clientHeight;
-  canvas.width = pixel_width * window.devicePixelRatio;
-  canvas.height = pixel_height * window.devicePixelRatio;
+  const { scale = true } = config || {};
+  canvas.width = pixel_width * (scale ? window.devicePixelRatio : 1);
+  canvas.height = pixel_height * (scale ? window.devicePixelRatio : 1);
   const ctx = canvas.getContext("webgpu");
   if (!ctx) throw new Error("webgpu context for canvas not available");
   // 配置 canvas 的上下文对象，这样 device 才可以绘制到 canvas 上去
@@ -170,13 +173,13 @@ type MipMapTextureType = {
   data: Uint8Array;
   width: number;
   height: number;
+  smooth?: boolean;
 };
 
-const createNextMipLevelRgba8Unorm = ({
-  data: src,
-  width: srcWidth,
-  height: srcHeight,
-}: MipMapTextureType) => {
+const createNextMipLevelRgba8Unorm = (
+  { data: src, width: srcWidth, height: srcHeight }: MipMapTextureType,
+  smooth: boolean = false
+) => {
   // compute the size of the next mip
   const dstWidth = Math.max(1, (srcWidth / 2) | 0);
   const dstHeight = Math.max(1, (srcHeight / 2) | 0);
@@ -213,24 +216,57 @@ const createNextMipLevelRgba8Unorm = ({
 
       // copy the "sampled" result into the dest.
       const dstOffset = (y * dstWidth + x) * 4;
-      dst.set(bilinearFilter(tl, tr, bl, br, t1, t2), dstOffset);
+      dst.set(bilinearFilter(tl, tr, bl, br, t1, t2, smooth), dstOffset);
     }
   }
   return { data: dst, width: dstWidth, height: dstHeight };
 };
 
-export function createMipMap(
+export function createMipMaps(
   src: Uint8Array,
   srcWidth: number,
-  srcHeight: number
+  srcHeight: number,
+  smooth: boolean = false
 ) {
   // populate with first mip level (base level)
   let mip = { data: src, width: srcWidth, height: srcHeight };
   const mips = [mip];
 
   while (mip.width > 1 || mip.height > 1) {
-    mip = createNextMipLevelRgba8Unorm(mip);
+    mip = createNextMipLevelRgba8Unorm(mip, smooth);
     mips.push(mip);
   }
   return mips;
+}
+
+export function createTextureFromSourceCPUMipmaps(
+  device: GPUDevice,
+  source: ImageData,
+  options?: CreateTextureOptions & { smooth?: boolean }
+) {
+  const [width, height] = getSourceSize(source);
+  const texture = device.createTexture({
+    label: options?.label ?? "",
+    format: "rgba8unorm-srgb",
+    mipLevelCount: options?.mips ? numMipLevels(width, height) : 1,
+    size: [width, height],
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  if (texture.mipLevelCount > 1) {
+    const mips = createMipMaps(
+      new Uint8Array(source.data),
+      width,
+      height,
+      options?.smooth
+    );
+    mips.forEach(({ data, width, height }, mipLevel) => {
+      device.queue.writeTexture(
+        { texture, mipLevel },
+        data,
+        { bytesPerRow: width * 4 },
+        { width, height }
+      );
+    });
+  }
+  return texture;
 }

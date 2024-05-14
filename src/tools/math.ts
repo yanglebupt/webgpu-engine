@@ -36,17 +36,27 @@ export function mix(
 ) {
   return a.map((v: number, i: number) => lerp(v, b[i], t));
 }
+export function max(a: number[] | TypedArray, b: number[] | TypedArray) {
+  return a.map((v: number, i: number) => Math.max(v, b[i]));
+}
+export function min(a: number[] | TypedArray, b: number[] | TypedArray) {
+  return a.map((v: number, i: number) => Math.min(v, b[i]));
+}
+export const smoothFn = (t: number) => 3 * Math.pow(t, 2) - 2 * Math.pow(t, 3);
 export function bilinearFilter(
   tl: number[] | TypedArray,
   tr: number[] | TypedArray,
   bl: number[] | TypedArray,
   br: number[] | TypedArray,
   t1: number,
-  t2: number
+  t2: number,
+  smooth: boolean = false
 ) {
-  const t = mix(tl, tr, t1);
-  const b = mix(bl, br, t1);
-  return mix(t, b, t2);
+  const _t1 = smooth ? smoothFn(t1) : t1;
+  const _t2 = smooth ? smoothFn(t2) : t2;
+  const t = mix(tl, tr, _t1);
+  const b = mix(bl, br, _t1);
+  return mix(t, b, _t2);
 }
 
 export function mod(x: number, a: number) {

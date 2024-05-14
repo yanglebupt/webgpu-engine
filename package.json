@@ -16,7 +16,9 @@
     "vite-plugin-top-level-await": "^1.4.1"
   },
   "dependencies": {
+    "@derschmale/io-rgbe": "^0.1.1",
     "dat.gui": "^0.7.9",
+    "webgpu-spd": "^2.0.0",
     "webgpu-utils": "^1.7.0",
     "wgpu-matrix": "^2.8.0",
     "wgsl-preprocessor": "^1.0.1"

@@ -67,7 +67,7 @@ export function numMipLevels(...sizes: number[]) {
 }
 
 export function getSourceSize(
-  source: ImageBitmap | HTMLCanvasElement | HTMLVideoElement
+  source: ImageBitmap | HTMLCanvasElement | HTMLVideoElement | ImageData
 ) {
   if (source instanceof HTMLVideoElement) {
     return [source.videoWidth, source.videoHeight];
@@ -78,8 +78,10 @@ export function getSourceSize(
 
 export type CreateTextureOptions = {
   mips?: boolean;
-  filpY?: boolean;
+  flipY?: boolean;
   label?: string;
+  format?: GPUTextureFormat;
+  colorSpace: PredefinedColorSpace;
 };
 
 export function createTextureFromSources(
@@ -90,7 +92,7 @@ export function createTextureFromSources(
   const [width, height] = getSourceSize(sources[0]);
   const texture = device.createTexture({
     label: options?.label ?? "",
-    format: "rgba8unorm",
+    format: options?.format ?? "rgba8unorm",
     mipLevelCount: options?.mips ? numMipLevels(width, height) : 1,
     size: [width, height, sources.length],
     usage:
@@ -100,7 +102,7 @@ export function createTextureFromSources(
   });
   sources.forEach((source, layer) => {
     device.queue.copyExternalImageToTexture(
-      { source, flipY: options?.filpY },
+      { source, flipY: options?.flipY },
       { texture, origin: [0, 0, layer] },
       { width, height }
     );

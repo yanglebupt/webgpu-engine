@@ -1,1 +1,9 @@
 其实 canvas 就是一个贴图 Texture
+
+- TEXTURE_BINDING，代表我们可以在使用 renderPass 的 shader 中使用 `textureSample` 采样 texel 颜色值
+- COPY_DST，代表我们可以拷贝值进入
+- RENDER_ATTACHMENT，代表渲染的目标，例如 renderPass 中的 canvas，copyExternalImageToTexture 也是将图像渲染到 texture 中
+- STORAGE_BINDING，代表我们在 computePass 的 shader 中可以用作存储贴图
+  - textureDimensions 获取维度
+  - textureLoad/textureStore 读写 pixel
+  - 不需要使用 samplers，也就不存在插值
