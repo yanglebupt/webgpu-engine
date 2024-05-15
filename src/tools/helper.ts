@@ -2,6 +2,50 @@ import { createCanvas, createRenderPipeline } from ".";
 import vertex from "./shaders/vertex-wgsl/full-plane.wgsl";
 import fragment from "./shaders/fragment-wgsl/image.wgsl?raw";
 
+export type MIME_TYPE = "image/jpeg" | "image/png" | "image/webp";
+
+export function saveCanvas(
+  id: string,
+  fileName?: string,
+  mime_type?: MIME_TYPE,
+  quality?: number
+): void;
+export function saveCanvas(
+  canvas: HTMLCanvasElement,
+  fileName?: string,
+  mime_type?: MIME_TYPE,
+  quality?: number
+): void;
+export function saveCanvas(
+  idOrCanvas: string | HTMLCanvasElement,
+  fileName: string = "test",
+  mime_type: MIME_TYPE = "image/jpeg",
+  quality: number = 1
+) {
+  let canvasElement: HTMLCanvasElement;
+  if (idOrCanvas instanceof HTMLCanvasElement) {
+    canvasElement = idOrCanvas;
+  } else {
+    const ele = document.getElementById(idOrCanvas);
+    if (!ele || !(ele instanceof HTMLCanvasElement)) {
+      throw new Error("need HTMLCanvasElement");
+    }
+    canvasElement = ele;
+  }
+  const MIME_TYPE = "image/png";
+  const imgURL = canvasElement.toDataURL(mime_type, quality);
+
+  const dlLink = document.createElement("a");
+  dlLink.download = fileName;
+  dlLink.href = imgURL;
+  dlLink.dataset.downloadurl = [MIME_TYPE, dlLink.download, dlLink.href].join(
+    ":"
+  );
+  document.body.appendChild(dlLink);
+  dlLink.click();
+  document.body.removeChild(dlLink);
+}
+
 export function createEmptyStorageTexture(
   device: GPUDevice,
   format: GPUTextureFormat,
@@ -176,13 +220,16 @@ export class StorageTextureToCanvas {
   render(
     texture: GPUTexture,
     showSize?: { width?: number; height?: number },
-    className?: string,
-    parentID?: string
-  ) {
+    options?: {
+      className?: string;
+      parentID?: string;
+    }
+  ): HTMLCanvasElement {
+    const { className, parentID } = options ?? {};
     const size = [texture.width, texture.height];
     let format = texture.format;
     if (format in PreferredCanvasFormats) {
-      const { ctx } = createCanvas(
+      const { ctx, canvas } = createCanvas(
         {
           width: showSize?.width ?? size[0],
           height: showSize?.height ?? size[1],
@@ -206,13 +253,14 @@ export class StorageTextureToCanvas {
         { texture: ctx.getCurrentTexture() },
         size
       );
+      return canvas;
     } else {
       const canvasFormat = PreferredCanvasFormats[0];
       const sampleType = TextureFormatSampleType[format]?.sampleType ?? "float";
       const filter: GPUSamplerBindingType = sampleType.includes("unfilterable")
         ? "non-filtering"
         : "filtering";
-      const { ctx } = createCanvas(
+      const { ctx, canvas } = createCanvas(
         {
           width: showSize?.width ?? size[0],
           height: showSize?.height ?? size[1],
@@ -284,6 +332,8 @@ export class StorageTextureToCanvas {
       renderPass.setPipeline(renderPipeline);
       renderPass.draw(3);
       renderPass.end();
+
+      return canvas;
     }
   }
 }
