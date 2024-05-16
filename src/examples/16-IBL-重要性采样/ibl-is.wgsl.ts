@@ -74,7 +74,7 @@ fn main(
           f32(atomicLoad(&radiance[1])),
           f32(atomicLoad(&radiance[2])));
   fin_radiance /= INT*f32(N);
-  textureStore(diffuseMap, vec2u(pixel.x, size.y-pixel.y), vec4f(fin_radiance,1.0));
+  textureStore(diffuseMap, pixel, vec4f(fin_radiance,1.0));
 }
 `;
 };

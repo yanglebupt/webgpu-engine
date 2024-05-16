@@ -84,5 +84,4 @@ fn main(@location(0) tc: vec2f) -> @location(0) vec4f {
   }
   radiance /= f32(N);
   return vec4f(radiance, 1.0);
-  // return textureSampleLevel(inputTexture, inputSampler, tc, uniforms.mipmapLevel);
 }

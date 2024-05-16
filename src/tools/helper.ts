@@ -223,9 +223,10 @@ export class StorageTextureToCanvas {
     options?: {
       className?: string;
       parentID?: string;
+      flipY?: boolean;
     }
   ): HTMLCanvasElement {
-    const { className, parentID } = options ?? {};
+    const { className, parentID, flipY = false } = options ?? {};
     const size = [texture.width, texture.height];
     let format = texture.format;
     if (format in PreferredCanvasFormats) {
@@ -311,7 +312,7 @@ export class StorageTextureToCanvas {
         bindGroupLayouts: [bindGroupLayout],
       });
 
-      const vertexStr = vertex(true);
+      const vertexStr = vertex(flipY);
       const renderPipeline = this.getFromCache(
         this.renderPipelineCache,
         { vertex: vertexStr, fragment, format: canvasFormat, entries },
