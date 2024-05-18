@@ -1,4 +1,4 @@
-export class StaticTextureUtils {
+export class StaticTextureUtil {
   static depthTexture: GPUTexture;
   static multiSampleTexture: GPUTexture;
 
@@ -14,18 +14,18 @@ export class StaticTextureUtils {
 
   static createDepthTexture(device: GPUDevice, size: [number, number]) {
     if (
-      StaticTextureUtils.checkTextureIsValid(
-        StaticTextureUtils.depthTexture,
+      StaticTextureUtil.checkTextureIsValid(
+        StaticTextureUtil.depthTexture,
         size
       )
     ) {
-      StaticTextureUtils.depthTexture = device.createTexture({
+      StaticTextureUtil.depthTexture = device.createTexture({
         size,
         format: "depth24plus",
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
       });
     }
-    return StaticTextureUtils.depthTexture;
+    return StaticTextureUtil.depthTexture;
   }
 
   static createMultiSampleTexture(
@@ -35,18 +35,18 @@ export class StaticTextureUtils {
     sampleCount: number
   ) {
     if (
-      StaticTextureUtils.checkTextureIsValid(
-        StaticTextureUtils.multiSampleTexture,
+      StaticTextureUtil.checkTextureIsValid(
+        StaticTextureUtil.multiSampleTexture,
         size
       )
     ) {
-      StaticTextureUtils.multiSampleTexture = device.createTexture({
+      StaticTextureUtil.multiSampleTexture = device.createTexture({
         format,
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
         size,
         sampleCount,
       });
     }
-    return StaticTextureUtils.multiSampleTexture;
+    return StaticTextureUtil.multiSampleTexture;
   }
 }

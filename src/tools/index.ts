@@ -36,7 +36,10 @@ export type CreateCanvasReturn = {
   height: number;
   aspect: number;
 };
-export type CreateCanvasConfig = GPUCanvasConfiguration & { scale?: boolean };
+export type CreateCanvasConfig = GPUCanvasConfiguration & {
+  scale?: boolean;
+  virtual?: boolean;
+};
 export function createCanvas(
   width: number | string,
   height: number | string,
@@ -86,6 +89,8 @@ export function createCanvas(
   canvas.id = "webgpu-canvas";
   !!className && (canvas.className = className);
 
+  const { scale = true, virtual = false } = config || {};
+
   // 页面展示的宽高
   const show_width = show_pixel_size ? (width as any).width : width;
   const show_height = show_pixel_size ? (width as any).height : height;
@@ -93,18 +98,19 @@ export function createCanvas(
     typeof show_width === "number" ? `${show_width}px` : show_width;
   canvas.style.height =
     typeof show_height === "number" ? `${show_height}px` : show_height;
-  (parentID ? document.getElementById(parentID) : document.body)?.appendChild(
-    canvas
-  );
+  if (virtual) {
+    if (typeof show_width !== "number" || typeof show_height !== "number")
+      throw new Error("virtual canvas width and height must be number");
+  } else
+    (parentID ? document.getElementById(parentID) : document.body)?.appendChild(
+      canvas
+    );
 
   // 实际像素宽高
-  const pixel_width = show_pixel_size
-    ? (height as any).width
-    : canvas.clientWidth;
-  const pixel_height = show_pixel_size
-    ? (height as any).height
-    : canvas.clientHeight;
-  const { scale = true } = config || {};
+  const clientWidth = virtual ? show_width : canvas.clientWidth;
+  const clientHeight = virtual ? show_height : canvas.clientHeight;
+  const pixel_width = show_pixel_size ? (height as any).width : clientWidth;
+  const pixel_height = show_pixel_size ? (height as any).height : clientHeight;
   canvas.width = pixel_width * (scale ? window.devicePixelRatio : 1);
   canvas.height = pixel_height * (scale ? window.devicePixelRatio : 1);
   const ctx = canvas.getContext("webgpu");
@@ -114,9 +120,9 @@ export function createCanvas(
   return {
     canvas,
     ctx,
-    width: canvas.clientWidth,
-    height: canvas.clientHeight,
-    aspect: canvas.clientWidth / canvas.clientHeight,
+    width: clientWidth,
+    height: clientHeight,
+    aspect: clientWidth / clientHeight,
   };
 }
 
@@ -169,6 +175,9 @@ export function createRenderPipeline(
   });
 }
 
+export function extractMipmapFromTexture() {}
+
+// 后续可以删除这部分
 type MipMapTextureType = {
   data: Uint8Array;
   width: number;

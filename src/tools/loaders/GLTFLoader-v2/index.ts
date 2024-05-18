@@ -363,7 +363,6 @@ export class GLTFLoaderV2 {
     onProgress?: (name: string, percentage: number) => void
   ) {
     const buffer = await (await fetchWithProgress(filename, (percentage) => {
-      console.log(percentage);
       onProgress && onProgress("downloading", 0.2 * percentage);
     })!)!.arrayBuffer();
     // 解析 Header 和 Json Chunk Header

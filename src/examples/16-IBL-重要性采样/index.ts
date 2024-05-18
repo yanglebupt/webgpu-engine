@@ -11,7 +11,10 @@ import {
   StorageTextureToCanvas,
   createEmptyStorageTexture,
 } from "../../tools/helper.ts";
-import { dispatch, dispatchImageAndSampler } from "./dispatch.ts";
+import {
+  dispatch,
+  dispatchImageAndSampler,
+} from "../../tools/utils/Dispatch.ts";
 
 // 加载 HDR 图片
 const base = location.href;

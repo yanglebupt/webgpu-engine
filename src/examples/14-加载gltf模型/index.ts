@@ -8,6 +8,7 @@ import { DirectionLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
 import { CreateAndSetRecord } from "../../tools/loaders";
 import { LoaderBarDomElement } from "./loaderBar";
+import { EnvMapLoader } from "../../tools/utils/envmap";
 
 const base = location.href;
 
@@ -135,12 +136,15 @@ const renderer = (await new WebGPURenderer({
 // 创建灯光
 const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
 
+const hdr_filename = `${base}image_imageBlaubeurenNight1k.hdr`;
+const envMap = await new EnvMapLoader().load(renderer.device, hdr_filename);
+
 async function init() {
   // 选择加载哪个模型
   const config = model_gltf_configs[settings.model_name];
 
-  // 创建场景对象
-  const scene = new Scene(renderer.device);
+  // 创建场景对象，并指定环境贴图
+  const scene = new Scene(renderer.device, { envMap });
   scene.add(light);
 
   // 创建相机和控制器

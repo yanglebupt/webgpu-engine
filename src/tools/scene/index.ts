@@ -4,10 +4,17 @@ import { CreateAndSetRecord } from "../loaders";
 import { GLTFScene } from "../loaders/GLTFLoader-v2";
 import { ExtendModel } from "../loaders/ObjLoader";
 import { vec3 } from "wgpu-matrix";
+import { EnvMap, EnvMapOptions } from "../utils/envmap";
 
 export type Object3D = ExtendModel | GLTFScene;
 export class UpdateController {
   update() {}
+}
+
+export interface SceneOption {
+  realtime?: boolean;
+  envMap?: EnvMap;
+  envMapOptions?: EnvMapOptions;
 }
 
 export class Scene {
@@ -20,7 +27,7 @@ export class Scene {
   public children: Object3D[] = [];
   public updates: UpdateController[] = [];
   public needUpdateBindGroup: boolean = false;
-  constructor(public device: GPUDevice) {
+  constructor(public device: GPUDevice, public options?: SceneOption) {
     this.bindGroupLayout = device.createBindGroupLayout({
       entries: [
         {

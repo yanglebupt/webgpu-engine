@@ -4,7 +4,8 @@ import {
   hammersley,
   textureUV,
 } from "../../tools/shaders/utils";
-import { IDX, axis } from "./dispatch";
+import { arrayProd } from "../../tools/math";
+import { IDX, axis } from "../../tools/utils/Dispatch";
 
 export default (
   format: GPUTextureFormat,
@@ -48,7 +49,7 @@ fn main(
   var dispatch_rad = vec3f(0.0);
   // dispatch_sample 很小，不如直接串行，否则还需要合并有些麻烦
   for(var j=0u; j<${dispatch_sample}; j++){
-    let i = local_invocation_id.${sample_axis} + j*${dispatch_sample};
+    let i = local_invocation_id.${sample_axis} + j*${arrayProd(chunkSize)};
     let random = hammersley(i, N);
     let sampleY = texture(inverseCDFMap, vec2f(0, random.y), size).b;
     let sampleX = texture(inverseCDFMap, vec2f(random.x, sampleY), size).g;

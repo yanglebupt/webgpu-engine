@@ -1,6 +1,6 @@
 import { createCanvas, createRenderPipeline } from ".";
 import vertex from "./shaders/vertex-wgsl/full-plane.wgsl";
-import fragment from "./shaders/fragment-wgsl/image.wgsl?raw";
+import fragment from "./shaders/fragment-wgsl/image.wgsl";
 
 export type MIME_TYPE = "image/jpeg" | "image/png" | "image/webp";
 
@@ -49,17 +49,19 @@ export function saveCanvas(
 export function createEmptyStorageTexture(
   device: GPUDevice,
   format: GPUTextureFormat,
-  size: [number, number],
-  options?: GPUTextureDescriptor
+  size: [number, number] | number[],
+  options?: Partial<GPUTextureDescriptor>
 ) {
   return device.createTexture({
     label: options?.label ?? "",
     usage:
+      (options?.usage ?? 0) |
       GPUTextureUsage.TEXTURE_BINDING |
       GPUTextureUsage.STORAGE_BINDING |
       GPUTextureUsage.COPY_SRC,
     format,
     size,
+    dimension: "2d",
   });
 }
 
@@ -219,6 +221,7 @@ export class StorageTextureToCanvas {
 
   render(
     texture: GPUTexture,
+    viewOption?: GPUTextureViewDescriptor,
     showSize?: { width?: number; height?: number },
     options?: {
       className?: string;
@@ -304,7 +307,7 @@ export class StorageTextureToCanvas {
         layout: bindGroupLayout,
         entries: [
           { binding: 0, resource: sampler },
-          { binding: 1, resource: texture.createView() },
+          { binding: 1, resource: texture.createView(viewOption ?? {}) },
         ],
       });
 
@@ -313,9 +316,15 @@ export class StorageTextureToCanvas {
       });
 
       const vertexStr = vertex(flipY);
+      const fragmentStr = fragment(0);
       const renderPipeline = this.getFromCache(
         this.renderPipelineCache,
-        { vertex: vertexStr, fragment, format: canvasFormat, entries },
+        {
+          vertex: vertexStr,
+          fragment: fragmentStr,
+          format: canvasFormat,
+          entries,
+        },
         (arg) => this.createRenderPipeline(arg, pipelineLayout)
       );
 

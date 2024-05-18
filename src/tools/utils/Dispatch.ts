@@ -117,6 +117,7 @@ export function dispatch(
   return {
     chunkSize: applySort(chunkSize, sort_idxs),
     dispatchSize: applySort(dispatchSize, sort_idxs),
+    order: sort_idxs as IDX[],
   };
 }
 
@@ -126,10 +127,8 @@ export type IDX = 0 | 1 | 2;
 export function dispatchImageAndSampler(
   image: [number, number],
   samplers: number,
-  maxInvocationXYZ: [number, number, number] | number[],
-  maxInvocations: number
+  maxInvocationXYZ: [number, number, number] | number[]
 ) {
-  const count_2 = Math.floor(Math.log2(maxInvocations)); // 去除非2次幂部分
   // invocation 需要从大到小排序，但我们需要获取对应索引
   const sort_idxs = arrayKeys(maxInvocationXYZ);
   mergeSort(maxInvocationXYZ, sort_idxs, "desc");
@@ -145,8 +144,41 @@ export function dispatchImageAndSampler(
   return {
     chunkSize,
     dispatchSize,
-    sampler_idx,
-    width_idx: sort_idxs[1] as IDX,
-    height_idx: sort_idxs[2] as IDX,
+    order: [sort_idxs[1], sort_idxs[2], sort_idxs[0]] as IDX[],
   };
+}
+
+export class DispatchCompute {
+  static limit(device: GPUDevice) {
+    const maxComputeWorkgroupLimits = [
+      device.limits.maxComputeWorkgroupSizeX,
+      device.limits.maxComputeWorkgroupSizeY,
+      device.limits.maxComputeWorkgroupSizeZ,
+    ];
+    const maxComputeInvocationsPerWorkgroup =
+      device.limits.maxComputeInvocationsPerWorkgroup;
+
+    return {
+      maxComputeWorkgroupLimits,
+      maxComputeInvocationsPerWorkgroup,
+    };
+  }
+  static dispatch(device: GPUDevice, size: number[]) {
+    const { maxComputeWorkgroupLimits, maxComputeInvocationsPerWorkgroup } =
+      DispatchCompute.limit(device);
+    return dispatch(
+      size,
+      maxComputeWorkgroupLimits,
+      maxComputeInvocationsPerWorkgroup
+    );
+  }
+
+  static dispatchImageAndSampler(
+    device: GPUDevice,
+    image: [number, number],
+    samplers: number
+  ) {
+    const { maxComputeWorkgroupLimits } = DispatchCompute.limit(device);
+    return dispatchImageAndSampler(image, samplers, maxComputeWorkgroupLimits);
+  }
 }

@@ -6,7 +6,7 @@ import {
 import vertex from "./shader/vertex.wgsl?raw";
 import fragment from "./shader/fragment.wgsl?raw";
 import { createCubeVertex } from "./data";
-import { StaticTextureUtils } from "../../tools/utils";
+import { StaticTextureUtils } from "../../tools/utils/StaticTextureUtil";
 import { mat4 } from "wgpu-matrix";
 import { degToRad } from "../../tools/math";
 import { GUI } from "dat.gui";

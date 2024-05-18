@@ -7,3 +7,7 @@
   - textureDimensions 获取维度
   - textureLoad/textureStore 读写 pixel
   - 不需要使用 samplers，也就不存在插值
+
+- storage texture 不能有 miplevel，所有的方法都没有 level 这个参数，只有 array_index 这个参数
+- textureDimensions，textureLoad 普通的 texture 也可以使用，但没有 filter，也就是 level 必须是 `u32/f32`
+- textureSample/textureSampleLevel 才有 filter，但是 storage texture 不能使用

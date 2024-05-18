@@ -30,6 +30,17 @@ fn textureUV(id: vec2u, size: vec2u) -> vec2f {
 fn texturePixel(uv: vec2f, size: vec2u) -> vec2u {
   return vec2u(uv * vec2f(size) - 0.5);
 }
+
+fn textureGrid(uv: vec2f, size: vec2u) -> vec4f {
+  let pixel_center = uv * vec2f(size) - 0.5;
+  let grid = vec2f(vec2u(pixel_center));
+  let gsp = select(
+      pixel_center - grid, 
+      vec2f(0.0), 
+      pixel_center<=vec2f(0.0) // || pixel_center>=vec2f(size)-1.0  后面这种情况一般不会发生
+  );
+  return vec4f(grid, gsp);
+}
 `;
 
 export const Coord = /* wgsl */ `
