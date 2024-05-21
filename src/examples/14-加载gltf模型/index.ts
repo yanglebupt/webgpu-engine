@@ -1,10 +1,10 @@
 import { degToRad } from "../../tools/math";
-import { GLTFLoaderV2 } from "../../tools/loaders/GLTFLoader-v2";
+import { GLTFLoaderV2, GLTFScene } from "../../tools/loaders/GLTFLoader-v2";
 import { OrbitController, PerspectiveCamera } from "../../tools/camera";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { GUI } from "dat.gui";
 import { Scene } from "../../tools/scene";
-import { DirectionLight } from "../../tools/lights";
+import { DirectionLight, PointLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
 import { CreateAndSetRecord } from "../../tools/loaders";
 import { LoaderBarDomElement } from "./loaderBar";
@@ -24,13 +24,6 @@ const model_gltf_configs: Record<
     zoomSpeed?: number;
   }
 > = {
-  bunny: {
-    path: `${base}bunny/bunny-export.obj`,
-    near: 1,
-    far: 100,
-    eye: [0, 2, 5],
-    target: [0, 0, 0],
-  },
   avocado: {
     path: `${base}gltf/Avocado.glb`,
     near: 0.01,
@@ -106,15 +99,19 @@ const model_gltf_configs: Record<
 let changed = true;
 const settings = {
   model_name: "stone_demon",
-  mips: true,
   flux: 10.0,
+  posLightY: 2.2,
+  mips: false,
+  envMap: true,
 };
 const gui = new GUI();
 gui
   .add(settings, "model_name", Object.keys(model_gltf_configs))
   .onChange(() => (changed = true));
-gui.add(settings, "mips").onChange(() => (changed = true));
 gui.add(settings, "flux", 1, 40);
+gui.add(settings, "posLightY", 0, 5).name("点光源 Y 位置"); // 后面我们会将物体平移到原点，这样就能看清点光源的移动了
+gui.add(settings, "mips");
+gui.add(settings, "envMap");
 
 const parentDom = document.createElement("div");
 parentDom.id = "canvas-parent";
@@ -135,9 +132,12 @@ const renderer = (await new WebGPURenderer({
 
 // 创建灯光
 const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
+const light_2 = new PointLight([0, 2.2, 0], [1, 0, 0, 1], 100);
 
 const hdr_filename = `${base}image_imageBlaubeurenNight1k.hdr`;
-const envMap = await new EnvMapLoader().load(renderer.device, hdr_filename);
+const envMap = await new EnvMapLoader().load(renderer.device, hdr_filename, {
+  format: renderer.format,
+});
 
 async function init() {
   // 选择加载哪个模型
@@ -146,6 +146,7 @@ async function init() {
   // 创建场景对象，并指定环境贴图
   const scene = new Scene(renderer.device, { envMap });
   scene.add(light);
+  scene.add(light_2);
 
   // 创建相机和控制器
   const camera = new PerspectiveCamera(
@@ -161,22 +162,21 @@ async function init() {
   scene.add(orbitController);
 
   // 加载 gltf 模型 或者 obj 模型
-  const loader = config.path.endsWith(".obj")
-    ? new ObjLoader()
-    : new GLTFLoaderV2();
+  const loader = new GLTFLoaderV2();
   loadingBar.showLoading();
   const model = await loader.load(renderer.device, config.path, {
-    bindGroupLayouts: [scene.bindGroupLayout],
+    scene,
     format: renderer.format,
     mips: settings.mips,
+    useEnvMap: settings.envMap,
     record: new CreateAndSetRecord(),
     onProgress: (name: string, percentage: number) => {
+      console.log(name, percentage);
       loadingBar.setPercentage(percentage, name);
     },
   });
   loadingBar.hiddenLoading();
-  scene.add(model);
-  return scene;
+  return { scene, model };
 }
 
 let recordDom = document.createElement("div");
@@ -184,11 +184,18 @@ recordDom.className = "record";
 document.body.appendChild(recordDom);
 
 let scene: Scene;
+let model: GLTFScene;
+
 export async function frame() {
   if (changed) {
-    scene = await init();
+    const res = await init();
+    scene = res.scene;
+    model = res.model;
   }
   light.flux = settings.flux;
+  light_2.pos[1] = settings.posLightY;
+  model.mips = settings.mips;
+  model.useEnvMap = settings.envMap;
   renderer?.render(scene, (record) => {
     if (changed)
       recordDom.innerHTML = `

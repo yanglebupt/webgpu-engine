@@ -2,6 +2,7 @@ export default (flipY = false) => /* wgsl */ `
   struct VaryStruct {
     @builtin(position) position: vec4f,
     @location(0) tc: vec2f,
+    @location(1) pos: vec4f,
   }
 
   @vertex
@@ -13,8 +14,9 @@ export default (flipY = false) => /* wgsl */ `
     );
 
     var o: VaryStruct;
-    o.position = vec4f(pos[vertexIndex], 0.0, 1.0); 
+    o.position = vec4f(pos[vertexIndex], 1.0, 1.0); 
     o.tc = pos[vertexIndex] * vec2f(0.5, ${flipY ? -0.5 : 0.5}) + 0.5;
+    o.pos = o.position;
     return o;
   }
 `;

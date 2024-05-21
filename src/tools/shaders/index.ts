@@ -14,6 +14,7 @@ export type ShaderContext = Record<string, any>;
 export const VP_NAME = "tf";
 export const M_INSTANCE_NAME = "mtfInstances";
 export const L_NAME = "lightCollection";
+export const ENV_NAME = "env";
 
 export const VPTransformationMatrixGroupBinding = /* wgsl */ `
 struct Transformation {
@@ -34,7 +35,24 @@ struct InputLight {
   ltype: u32,
 };
 
-@group(0) @binding(1) var<storage> ${L_NAME}: array<InputLight>;
+struct InputLightGroup {
+  lightNums: u32,
+  lights: array<InputLight>
+}
+
+@group(0) @binding(1) var<storage> ${L_NAME}: InputLightGroup;
+`;
+
+export const EnvMapGroupBinding = /* wgsl */ `
+struct EnvUniform {
+  diffuseColor: vec4f,
+  specularColor: vec4f,
+  diffuseFactor: vec3f,
+  specularFactor: vec3f,
+};
+@group(0) @binding(2) var diffuseMap: texture_2d<f32>;
+@group(0) @binding(3) var specularMap: texture_2d_array<f32>;
+@group(0) @binding(4) var<uniform> ${ENV_NAME}: EnvUniform;
 `;
 
 export const MTransformationMatrixGroupBinding = /* wgsl */ `

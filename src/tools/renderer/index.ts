@@ -60,7 +60,7 @@ export class WebGPURenderer {
     const envMap = scene.options?.envMap;
     if (envMap && ((!realtime && !this.done) || realtime)) {
       const computePass = encoder.beginComputePass();
-      envMap!.compute(computePass, scene.options?.envMapOptions);
+      envMap!.compute(computePass);
       computePass.end();
     }
     const canvasTexture = this.ctx.getCurrentTexture();
@@ -89,7 +89,11 @@ export class WebGPURenderer {
     if (envMap && !this.done) {
       const sc = new StorageTextureToCanvas(this.device, encoder);
       sc.render(envMap.diffuseTexure, {});
-      sc.render(envMap.specularTexure, {});
+      sc.render(envMap.specularTexure, {
+        dimension: "2d",
+        baseArrayLayer: 1,
+        arrayLayerCount: 1,
+      });
     }
     this.device.queue.submit([encoder.finish()]);
     this.done = true;

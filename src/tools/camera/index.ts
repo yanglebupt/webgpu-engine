@@ -17,7 +17,6 @@ export interface Camera {
   matrix: Mat4;
   viewMatrix: Mat4;
   cameraPosition: Vec3;
-  render(renderPass: GPURenderPassEncoder): void;
 }
 
 export class Camera {
@@ -31,24 +30,13 @@ export class Camera {
       Camera.view = makeStructuredView(Camera.defs.uniforms[VP_NAME]);
     } catch (error) {}
   }
+
   constructor() {
+    this.eye = [0, 0, 0];
+    this.target = [0, 0, 0];
+    this.up = [0, 1, 0];
     this.viewMatrix = mat4.identity();
     this.cameraPosition = vec3.zero();
-  }
-}
-export class PerspectiveCamera extends Camera {
-  eye: Vec3 = [0, 0, 0];
-  target: Vec3 = [0, 0, 0];
-  up: Vec3 = [0, 1, 0];
-
-  constructor(
-    fieldOfViewYInRadians: number,
-    aspect: number,
-    zNear: number,
-    zFar: number
-  ) {
-    super();
-    this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, zNear, zFar);
   }
 
   lookAt(eye: Vec3, target?: Vec3, up?: Vec3) {
@@ -57,6 +45,26 @@ export class PerspectiveCamera extends Camera {
     if (up) this.up = up;
     this.viewMatrix = mat4.lookAt(this.eye, this.target, this.up);
     this.cameraPosition = vec3.getTranslation(mat4.inverse(this.viewMatrix));
+  }
+
+  getBufferView() {
+    return {
+      projectionMatrix: this.matrix,
+      viewMatrix: this.viewMatrix,
+      cameraPosition: this.cameraPosition,
+    };
+  }
+}
+
+export class PerspectiveCamera extends Camera {
+  constructor(
+    fieldOfViewYInRadians: number,
+    aspect: number,
+    zNear: number,
+    zFar: number
+  ) {
+    super();
+    this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, zNear, zFar);
   }
 }
 

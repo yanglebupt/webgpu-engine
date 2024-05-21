@@ -12,6 +12,7 @@ export default (
   polyfill: boolean,
   format: GPUTextureFormat,
   mipLevels: [number, number],
+  roughnesses: number[],
   chunkSize: number[],
   dispatch_sample: number,
   order: IDX[],
@@ -20,10 +21,15 @@ export default (
 ) => {
   const [width_idx, height_idx, sampler_idx] = order;
   const sample_axis = axis[sampler_idx];
-  console.log(`N: u32(${chunkSize[sampler_idx]})*${dispatch_sample}`);
-  let mipLevelStr = "const mipLevels: array<f32, 2> = array(";
+  const sampleChunk = chunkSize[sampler_idx];
+  console.log(`N: u32(${sampleChunk})*${dispatch_sample}`);
+  let mipLevelStr = `const mipLevels: array<f32, ${mipLevels.length}> = array(`;
   mipLevels.forEach((l) => (mipLevelStr += `${l},`));
   mipLevelStr += ");";
+
+  let roughnessStr = `const roughnesses: array<f32, ${roughnesses.length}> = array(`;
+  roughnesses.forEach((r) => (roughnessStr += `${r},`));
+  roughnessStr += ");";
 
   return wgsl/* wgsl */ `
 #if ${polyfill}
@@ -34,7 +40,7 @@ export default (
 ${mipLevelStr}
 #endif
 @group(0) @binding(1) var diffuseMap: texture_storage_2d<${format}, write>;
-@group(0) @binding(2) var specularMap: texture_storage_2d<${format}, write>;
+@group(0) @binding(2) var specularMap: texture_storage_2d_array<${format}, write>;
 
 var<workgroup> diffuse_radiance: array<atomic<u32>, 3>;
 var<workgroup> specular_radiance: array<atomic<u32>, 3>;
@@ -42,7 +48,11 @@ var<workgroup> specular_radiance: array<atomic<u32>, 3>;
 const PI = 3.141592653589793;
 const DIFFUSE_INT: f32 = ${diffuse_INT};
 const SPECULAR_INT: f32 = ${specular_INT};
-const shininess:f32 = 600.0;
+${roughnessStr}
+
+fn roughness2shininess(roughness: f32) -> f32 {
+  return pow(1000.0, 1.-roughness);
+}
 
 ${textureUV}
 ${Coord}
@@ -72,7 +82,7 @@ fn diffuse_sample(random: vec2f, TBN: mat3x3f, size: vec2u) -> vec3f {
   return radiance;
 }
 
-fn specular_sample(random: vec2f, TBN: mat3x3f, size: vec2u) -> vec3f {
+fn specular_sample(random: vec2f, TBN: mat3x3f, size: vec2u, shininess: f32) -> vec3f {
   let phi = 2.0*PI*random.x;
   let theta = acos( pow(1.0-random.y, 1.0/(1.0+shininess)) );
   let pos = TBN * SphereCoord2Dir(phi, theta);
@@ -111,8 +121,11 @@ fn read_radiance() -> array<vec3f,2> {
 @compute @workgroup_size(${chunkSize.join(",")})
 fn main(
   @builtin(global_invocation_id) id: vec3u,
+  @builtin(workgroup_id) workgroup_id : vec3<u32>,
   @builtin(local_invocation_id) local_invocation_id: vec3u,
 ) {
+  let roughness_idx = workgroup_id.${axis[sampler_idx]};
+
   let pixel = id.${axis[width_idx]}${axis[height_idx]};
   let size = textureDimensions(diffuseMap);
   let tc = textureUV(pixel, size);
@@ -120,15 +133,17 @@ fn main(
   let normal = SphereTexCoord2Dir(tc);
   let TBN = getNormalSpace(normal);
 
-  let N = u32(${chunkSize[sampler_idx]})*${dispatch_sample};
+  let N = u32(${sampleChunk})*${dispatch_sample};
   var diffuse_dispatch_rad = vec3f(0.0);
   var specular_dispatch_rad = vec3f(0.0);
 
+  let shininess = roughness2shininess(roughnesses[roughness_idx]);
+
   for(var j=0u; j<${dispatch_sample}; j++){
-    let i = local_invocation_id.${sample_axis} + j*${arrayProd(chunkSize)};
+    let i = local_invocation_id.${sample_axis} + j*${sampleChunk};
     let random = hammersley(i, N);
     diffuse_dispatch_rad += diffuse_sample(random, TBN, size);
-    specular_dispatch_rad += specular_sample(random, TBN, size);
+    specular_dispatch_rad += specular_sample(random, TBN, size, shininess);
   }
 
   add_radiance(diffuse_dispatch_rad, specular_dispatch_rad);
@@ -142,7 +157,7 @@ fn main(
   fin_specular_radiance /= (f32(N)*(1.0+shininess)/(2.0+shininess));
 
   textureStore(diffuseMap, pixel, vec4f(fin_diffuse_radiance,1.0));
-  textureStore(specularMap, pixel, vec4f(fin_specular_radiance,1.0));
+  textureStore(specularMap, pixel, roughness_idx, vec4f(fin_specular_radiance,1.0));
 }
 `;
 };

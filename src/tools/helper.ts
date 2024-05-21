@@ -1,4 +1,4 @@
-import { createCanvas, createRenderPipeline } from ".";
+import { CreateCanvasReturn, createCanvas, createRenderPipeline } from ".";
 import vertex from "./shaders/vertex-wgsl/full-plane.wgsl";
 import fragment from "./shaders/fragment-wgsl/image.wgsl";
 
@@ -224,60 +224,67 @@ export class StorageTextureToCanvas {
     viewOption?: GPUTextureViewDescriptor,
     showSize?: { width?: number; height?: number },
     options?: {
+      canvasReturn?: CreateCanvasReturn;
       className?: string;
       parentID?: string;
       flipY?: boolean;
     }
-  ): HTMLCanvasElement {
+  ): CreateCanvasReturn {
     const { className, parentID, flipY = false } = options ?? {};
     const size = [texture.width, texture.height];
     let format = texture.format;
+    let canvasReturn: CreateCanvasReturn;
     if (format in PreferredCanvasFormats) {
-      const { ctx, canvas } = createCanvas(
-        {
-          width: showSize?.width ?? size[0],
-          height: showSize?.height ?? size[1],
-        },
-        { width: size[0], height: size[1] },
-        {
-          format,
-          scale: false,
-          device: this.device,
-          usage:
-            GPUTextureUsage.TEXTURE_BINDING |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.COPY_DST,
-        },
-        className,
-        parentID
-      );
+      canvasReturn =
+        options?.canvasReturn ??
+        createCanvas(
+          {
+            width: showSize?.width ?? size[0],
+            height: showSize?.height ?? size[1],
+          },
+          { width: size[0], height: size[1] },
+          {
+            format,
+            scale: false,
+            device: this.device,
+            usage:
+              GPUTextureUsage.TEXTURE_BINDING |
+              GPUTextureUsage.STORAGE_BINDING |
+              GPUTextureUsage.COPY_DST,
+          },
+          className,
+          parentID
+        );
+      const { ctx } = canvasReturn;
 
       this.encoder.copyTextureToTexture(
         { texture: texture },
         { texture: ctx.getCurrentTexture() },
         size
       );
-      return canvas;
     } else {
       const canvasFormat = PreferredCanvasFormats[0];
       const sampleType = TextureFormatSampleType[format]?.sampleType ?? "float";
       const filter: GPUSamplerBindingType = sampleType.includes("unfilterable")
         ? "non-filtering"
         : "filtering";
-      const { ctx, canvas } = createCanvas(
-        {
-          width: showSize?.width ?? size[0],
-          height: showSize?.height ?? size[1],
-        },
-        { width: size[0], height: size[1] },
-        {
-          format: canvasFormat,
-          scale: false,
-          device: this.device,
-        },
-        className,
-        parentID
-      );
+      canvasReturn =
+        options?.canvasReturn ??
+        createCanvas(
+          {
+            width: showSize?.width ?? size[0],
+            height: showSize?.height ?? size[1],
+          },
+          { width: size[0], height: size[1] },
+          {
+            format: canvasFormat,
+            scale: false,
+            device: this.device,
+          },
+          className,
+          parentID
+        );
+      const { ctx } = canvasReturn;
 
       const entries = [
         {
@@ -343,7 +350,9 @@ export class StorageTextureToCanvas {
       renderPass.draw(3);
       renderPass.end();
 
-      return canvas;
+      return canvasReturn;
     }
+
+    return canvasReturn;
   }
 }

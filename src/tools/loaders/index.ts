@@ -1,3 +1,5 @@
+import { Scene } from "../scene";
+
 export class CreateAndSetRecord {
   // 创建了多少个 pipeline
   public pipelineCount: number = 0;
@@ -14,9 +16,10 @@ export class CreateAndSetRecord {
 }
 
 export interface BuiltRenderPipelineOptions {
-  bindGroupLayouts: GPUBindGroupLayout[];
+  scene: Scene;
   format: GPUTextureFormat;
   mips?: boolean;
+  useEnvMap?: boolean;
   depthFormat?: GPUTextureFormat;
   record?: CreateAndSetRecord;
   onProgress?: (name: string, percentage: number) => void;
@@ -29,7 +32,8 @@ export class SolidColorTextureView {
   setFormat(format: GPUTextureFormat) {
     this.format = format;
   }
-  async uploadTexture(device: GPUDevice) {
+
+  uploadTexture(device: GPUDevice) {
     if (!this.format) {
       return;
     }
@@ -76,11 +80,9 @@ export class SolidColorTexture {
     b: 1,
     a: 1,
   });
-  static async upload(device: GPUDevice) {
-    return Promise.all([
-      SolidColorTexture.defaultNormalTexture.uploadTexture(device),
-      SolidColorTexture.transparentBlackTexture.uploadTexture(device),
-      SolidColorTexture.opaqueWhiteTexture.uploadTexture(device),
-    ]);
+  static upload(device: GPUDevice) {
+    SolidColorTexture.defaultNormalTexture.uploadTexture(device);
+    SolidColorTexture.transparentBlackTexture.uploadTexture(device);
+    SolidColorTexture.opaqueWhiteTexture.uploadTexture(device);
   }
 }

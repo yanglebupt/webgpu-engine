@@ -1,5 +1,5 @@
 import { fetchWithProgress } from "../../common";
-import { decodeHeader, decodeRGBE, flipX, flipY } from "../../io-rgbe-main";
+import { decodeHeader, decodeRGBE, flipX, flipY } from "./io-rgbe-main";
 
 /* 
   确保精度，HDR 转成 rgba8unorm 很容易失去精度导致结果 bard

@@ -1,4 +1,6 @@
 export class StaticTextureUtil {
+  static renderFormat: GPUTextureFormat = "rgba8unorm";
+  static depthFormat: GPUTextureFormat = "depth24plus";
   static depthTexture: GPUTexture;
   static multiSampleTexture: GPUTexture;
 
@@ -12,7 +14,11 @@ export class StaticTextureUtil {
     return expired;
   }
 
-  static createDepthTexture(device: GPUDevice, size: [number, number]) {
+  static createDepthTexture(
+    device: GPUDevice,
+    size: [number, number],
+    format?: GPUTextureFormat
+  ) {
     if (
       StaticTextureUtil.checkTextureIsValid(
         StaticTextureUtil.depthTexture,
@@ -21,7 +27,7 @@ export class StaticTextureUtil {
     ) {
       StaticTextureUtil.depthTexture = device.createTexture({
         size,
-        format: "depth24plus",
+        format: format ?? StaticTextureUtil.depthFormat,
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
       });
     }
@@ -31,8 +37,8 @@ export class StaticTextureUtil {
   static createMultiSampleTexture(
     device: GPUDevice,
     size: [number, number],
-    format: GPUTextureFormat,
-    sampleCount: number
+    sampleCount: number,
+    format?: GPUTextureFormat
   ) {
     if (
       StaticTextureUtil.checkTextureIsValid(
@@ -41,7 +47,7 @@ export class StaticTextureUtil {
       )
     ) {
       StaticTextureUtil.multiSampleTexture = device.createTexture({
-        format,
+        format: format ?? StaticTextureUtil.renderFormat,
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
         size,
         sampleCount,

@@ -1,5 +1,12 @@
 import { wgsl } from "wgsl-preprocessor";
-import { L_NAME, LightGroupBinding, ShaderContext } from "..";
+import {
+  ENV_NAME,
+  EnvMapGroupBinding,
+  L_NAME,
+  LightGroupBinding,
+  ShaderContext,
+} from "..";
+import { Coord } from "../utils";
 
 export const M_U_NAME = "material";
 export const MaterialUniform = /* wgsl */ `
@@ -12,6 +19,7 @@ struct Material {
   occlusionStrength: f32,
   alphaCutoff: f32,
   applyNormalMap: u32,
+  useEnvMap: u32,
 }
 
 @group(2) @binding(0) var<uniform> ${M_U_NAME}: Material;
@@ -27,6 +35,9 @@ const ESP = 0.001;
 const reflectance = 0.5;
 
 ${LightGroupBinding}
+#if ${context.hasEnvMap}
+${EnvMapGroupBinding}
+#endif
 ${MaterialUniform}
 // 贴图
 @group(2) @binding(1) var baseColorTexture: texture_2d<f32>;
@@ -141,6 +152,32 @@ fn radiance_render(brdf: vec3f, ir: vec3f) -> vec3f {
   return brdf * ir;
 }
 
+#if ${context.hasEnvMap}
+${Coord}
+fn envIBL(diffuseMap: texture_2d<f32>, specularMap: texture_2d_array<f32>, 
+          n: vec3f, v: vec3f, _sampler: sampler) -> vec3f {
+
+  let r_v = reflect(-v, n);
+  // linear
+  let env_diff = textureSample(diffuseMap,_sampler,Dir2SphereTexCoord(n)).rgb;
+  let env_spec = textureSample(specularMap,_sampler,Dir2SphereTexCoord(r_v),0u).rgb;
+  let rho_d =  ${ENV_NAME}.diffuseFactor * rgb2lin(${ENV_NAME}.diffuseColor.rgb);
+  let rho_s = ${ENV_NAME}.specularFactor * rgb2lin(${ENV_NAME}.specularColor.rgb);
+  
+  var radiance = rho_d * env_diff;
+  let rn = dot(n, r_v);
+  if(rn>0.0){
+    radiance += rn * rho_s * env_spec;
+  }
+  return radiance;
+}
+#endif
+
+fn textureSample_rgb2lin(texture: texture_2d<f32>, _sampler: sampler, uv: vec2f) -> vec4f {
+  let col = textureSample(texture, _sampler, uv);
+  return vec4f(rgb2lin(col.rgb), col.a);
+}
+
 @fragment
 fn main(
   @location(0) norm: vec3f, 
@@ -148,21 +185,27 @@ fn main(
   @location(2) uv0: vec2f,  
   @location(3) cameraPos: vec3f
 ) -> @location(0) vec4f {
-  let baseColor = ${M_U_NAME}.baseColorFactor * textureSample(baseColorTexture, materialSampler, uv0);
+
+  let baseColor = ${M_U_NAME}.baseColorFactor * textureSample_rgb2lin(baseColorTexture, materialSampler, uv0);
   let metallicRoughness = textureSample(metallicRoughnessTexture, materialSampler, uv0);
   let roughness = ${M_U_NAME}.roughnessFactor * metallicRoughness.g;
   let metallic = ${M_U_NAME}.metallicFactor * metallicRoughness.b;
-  let emissiveColor = ${M_U_NAME}.emissiveFactor * textureSample(emissiveTexture, materialSampler, uv0).rgb;
+  let emissiveColor = ${M_U_NAME}.emissiveFactor * textureSample_rgb2lin(emissiveTexture, materialSampler, uv0).rgb;
   
   let v = normalize(cameraPos-pos);
   let n = select(normalize(norm), 
                 applyNormalMap(textureSample(normalTexture, materialSampler, uv0).xyz, uv0, normalize(norm), v),
                 bool(${M_U_NAME}.applyNormalMap));
 
-  var radiance = rgb2lin(emissiveColor);  
+  #if ${context.hasEnvMap}
+  var radiance = emissiveColor + 
+            select(vec3f(0.0), envIBL(diffuseMap,specularMap,n,v,materialSampler), bool(${M_U_NAME}.useEnvMap));
+  #else
+  var radiance = emissiveColor;
+  #endif
   ///////////////////////////////////////////
-  for(var i=0u; i<arrayLength(&${L_NAME}); i++){
-    let in_light = ${L_NAME}[i];
+  for(var i=0u; i<${L_NAME}.lightNums; i++){
+    let in_light = ${L_NAME}.lights[i];
     var out_light: Light;
     switch in_light.ltype {
       case 1: {
@@ -177,7 +220,7 @@ fn main(
         break; 
       }
     }
-    let brdf = cook_torrance_MicrofacetBRDF(out_light.dir, n, v, rgb2lin(baseColor.rgb),
+    let brdf = cook_torrance_MicrofacetBRDF(out_light.dir, n, v, baseColor.rgb,
                           roughness, metallic, reflectance);
                           
     radiance += radiance_render(brdf, out_light.ir);

@@ -4,6 +4,7 @@ import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
 import fragment from "../../shaders/fragment-wgsl/display-light.wgsl?raw";
 import { ShaderLocation, ShaderModuleCode } from "../../shaders";
 import { Mat4, mat4 } from "wgpu-matrix";
+import { StaticTextureUtil } from "../../utils/StaticTextureUtil";
 
 export class ExtendModel {
   public comments: string[] = [];
@@ -117,7 +118,7 @@ export class ExtendModel {
     fragment: ShaderModuleCode,
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
-    depthFormat: GPUTextureFormat = "depth24plus",
+    depthFormat: GPUTextureFormat = StaticTextureUtil.depthFormat,
     record?: CreateAndSetRecord
   ) {
     this.renderBuffers = this.makeBuffers(device, { indexFormat: "uint32" });
@@ -167,7 +168,7 @@ export class ExtendModel {
     device: GPUDevice,
     bindGroupLayouts: GPUBindGroupLayout[],
     format: GPUTextureFormat,
-    depthFormat: GPUTextureFormat = "depth24plus",
+    depthFormat: GPUTextureFormat = StaticTextureUtil.depthFormat,
     record?: CreateAndSetRecord
   ) {
     return this.buildRenderPipeline(
