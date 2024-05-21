@@ -6,7 +6,7 @@ import {
 } from "webgpu-utils";
 import { createComputePipeline, createRenderPipeline } from "../..";
 import { createEmptyStorageTexture } from "../../helper";
-import { HDRLoader } from "../../loaders/HDRLoader";
+import { HDRLoader, HDRLoaderReturn } from "../../loaders/HDRLoader";
 import { DispatchCompute } from "../Dispatch";
 import { MipMap, maxMipLevelCount } from "../mipmaps";
 import IBL_BRDF_IS from "./shader/ibl-brdf-is.wgsl";
@@ -16,6 +16,13 @@ import vertex from "../../shaders/vertex-wgsl/full-plane.wgsl";
 import fragment from "../../shaders/fragment-wgsl/skybox.wgsl";
 import { Camera } from "../../camera";
 import { StaticTextureUtil } from "../StaticTextureUtil";
+import {
+  BuildOptions,
+  Buildable,
+  Computable,
+  Renderable,
+  VirtualView,
+} from "../../scene/types";
 
 export interface EnvMapPartOptions {
   mipLevel?: number;
@@ -34,23 +41,37 @@ export interface EnvMapOptions {
   specularColor?: Vec4;
   diffuseFactor?: Vec3;
   specularFactor?: Vec3;
-
-  format: GPUTextureFormat;
-  depthFormat?: GPUTextureFormat;
 }
 
 export interface EnvMap {
+  hdrReturn: HDRLoaderReturn<Float32Array>;
+  options?: EnvMapOptions;
+
   polyfill: boolean;
   texture: GPUTexture;
   diffuseTexure: GPUTexture;
   specularTexure: GPUTexture;
   destroyed: boolean;
-  options?: EnvMapOptions;
   destroy(): void;
-  compute(computePass: GPUComputePassEncoder): void;
+
+  renderPipeline: GPURenderPipeline;
+  bindGroup: GPUBindGroup;
+  uniformBuffer: GPUBuffer;
 }
 
-export class EnvMap {
+export abstract class EnvMap
+  implements
+    Buildable,
+    Computable,
+    Renderable<
+      (
+        renderPass: GPURenderPassEncoder,
+        device: GPUDevice,
+        camera: Camera
+      ) => void
+    >,
+    VirtualView
+{
   static features: GPUFeatureName[] = ["float32-filterable"];
   static defs: ShaderDataDefinitions;
   static view: StructuredView;
@@ -61,24 +82,67 @@ export class EnvMap {
     } catch (error) {}
   }
 
-  renderPipeline: GPURenderPipeline;
-  bindGroup: GPUBindGroup;
-  uniformBuffer: GPUBuffer;
   constructor(
-    public device: GPUDevice,
-    public texture: GPUTexture,
+    public hdrReturn: HDRLoaderReturn<Float32Array>,
     public options?: EnvMapOptions
-  ) {
-    this.polyfill = !this.device.features.has("float32-filterable");
+  ) {}
+
+  abstract compute(
+    computePass: GPUComputePassEncoder,
+    device?: GPUDevice
+  ): void;
+
+  build({
+    device,
+    format,
+    depthFormat = StaticTextureUtil.depthFormat,
+  }: BuildOptions) {
+    const { color, width, height } = this.hdrReturn;
+    const { mipmaps = true } = this.options ?? {};
+    const _format: GPUTextureFormat = "rgba32float";
+    this.polyfill = !device.features.has("float32-filterable");
+
+    // hdr 贴图
+    this.texture = device.createTexture({
+      format: _format,
+      mipLevelCount: mipmaps ? maxMipLevelCount(width, height) : 1,
+      size: [width, height],
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC,
+    });
+    device.queue.writeTexture(
+      { texture: this.texture },
+      color,
+      { bytesPerRow: width * 16 },
+      { width, height }
+    );
+
+    // IBL IS 后的贴图
+    this.diffuseTexure = createEmptyStorageTexture(device, _format, [
+      width,
+      height,
+    ]);
+    const details = this.options?.specular?.roughnessDetail ?? 3;
+    console.log(`roughnessDetail: ${details}`);
+    this.specularTexure = createEmptyStorageTexture(device, _format, [
+      width,
+      height,
+      details,
+    ]);
+
+    // 渲染管线
     this.renderPipeline = createRenderPipeline(
       vertex(true),
       fragment(),
       device,
-      options?.format ?? StaticTextureUtil.renderFormat,
+      format,
       [null],
       {
         depthStencil: {
-          format: options?.depthFormat ?? StaticTextureUtil.depthFormat,
+          format: depthFormat,
           depthWriteEnabled: true,
           depthCompare: "less-equal",
         },
@@ -94,7 +158,7 @@ export class EnvMap {
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: sampler },
-        { binding: 2, resource: texture.createView() },
+        { binding: 2, resource: this.texture.createView() },
       ],
     });
   }
@@ -108,13 +172,13 @@ export class EnvMap {
     };
   }
 
-  render(renderPass: GPURenderPassEncoder, camera: Camera) {
+  render(renderPass: GPURenderPassEncoder, device: GPUDevice, camera: Camera) {
     const pvInverse = mat4.inverse(
       mat4.multiply(camera.matrix, camera.viewMatrix)
     ); // inverse(projection * view) 进行顶点变换，（clip space 转 世界坐标）作为 cubemap 采样的坐标
     const uniformValue = new Float32Array(4 * 4);
     uniformValue.set(pvInverse);
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformValue);
+    device.queue.writeBuffer(this.uniformBuffer, 0, uniformValue);
     renderPass.setPipeline(this.renderPipeline);
     renderPass.setBindGroup(0, this.bindGroup);
     renderPass.draw(3);
@@ -124,20 +188,11 @@ export class EnvMap {
 export class EnvMapBRDFIS extends EnvMap {
   public mipmapFilterTexture?: GPUTexture;
   public sampler?: GPUSampler;
-  constructor(device: GPUDevice, texture: GPUTexture, options?: EnvMapOptions) {
-    super(device, texture, options);
-    const { width, height, format, mipLevelCount } = this.texture;
-    this.diffuseTexure = createEmptyStorageTexture(this.device, format, [
-      width,
-      height,
-    ]);
-    const details = options?.specular?.roughnessDetail ?? 3;
-    console.log(`roughnessDetail: ${details}`);
-    this.specularTexure = createEmptyStorageTexture(this.device, format, [
-      width,
-      height,
-      details,
-    ]);
+  constructor(
+    hdrReturn: HDRLoaderReturn<Float32Array>,
+    options?: EnvMapOptions
+  ) {
+    super(hdrReturn, options);
   }
 
   destroy() {
@@ -147,8 +202,8 @@ export class EnvMapBRDFIS extends EnvMap {
     this.destroyed = true;
   }
 
-  compute(computePass: GPUComputePassEncoder) {
-    const mipmap = new MipMap(this.device, computePass);
+  compute(computePass: GPUComputePassEncoder, device: GPUDevice) {
+    const mipmap = new MipMap(device, computePass);
     mipmap.generateMipmaps(this.texture);
     const mipLevels = [
       this.options?.diffuse?.mipLevel ?? 6,
@@ -158,7 +213,7 @@ export class EnvMapBRDFIS extends EnvMap {
       console.log("float32-filterable unsupported, try use polyfill");
       ////////////////提取 mipmap 后的贴图/////////////////
       this.mipmapFilterTexture = createEmptyStorageTexture(
-        this.device,
+        device,
         this.texture.format,
         [this.texture.width, this.texture.height, mipLevels.length]
       );
@@ -168,13 +223,13 @@ export class EnvMapBRDFIS extends EnvMap {
       });
     } else {
       console.log("float32-filterable supported");
-      this.sampler = this.device.createSampler({
+      this.sampler = device.createSampler({
         minFilter: "linear",
         magFilter: "linear",
       });
     }
     const { pipeline, bindGroup, dispatchSize } =
-      this.build_IBL_BRDF_IS_ComputePass(mipLevels);
+      this.build_IBL_BRDF_IS_ComputePass(device, mipLevels);
     computePass.setPipeline(pipeline);
     computePass.setBindGroup(0, bindGroup);
     computePass.dispatchWorkgroups(
@@ -192,7 +247,10 @@ export class EnvMapBRDFIS extends EnvMap {
     return arr;
   }
 
-  build_IBL_BRDF_IS_ComputePass(mipLevels: [number, number]) {
+  build_IBL_BRDF_IS_ComputePass(
+    device: GPUDevice,
+    mipLevels: [number, number]
+  ) {
     const { width, height, format } = this.texture;
     const roughnesses = this.generateRoughness(
       this.specularTexure!.depthOrArrayLayers
@@ -200,7 +258,7 @@ export class EnvMapBRDFIS extends EnvMap {
     const samplers = this.options?.samplers ?? 512;
     const { chunkSize, dispatchSize, order } =
       DispatchCompute.dispatchImageAndSampler(
-        this.device,
+        device,
         [width, height],
         samplers
       );
@@ -219,7 +277,7 @@ export class EnvMapBRDFIS extends EnvMap {
         this.options?.diffuse?.INT ?? 1e4,
         this.options?.specular?.INT ?? 1e4
       ),
-      this.device
+      device
     );
     dispatchSize[order[2]] = roughnesses.length;
     const entries: GPUBindGroupEntry[] = [
@@ -244,7 +302,7 @@ export class EnvMapBRDFIS extends EnvMap {
         binding: 3,
         resource: this.sampler!,
       });
-    const bindGroup = this.device.createBindGroup({
+    const bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: entries,
     });
@@ -252,37 +310,19 @@ export class EnvMapBRDFIS extends EnvMap {
   }
 }
 
-export class EnvMapIBLIS extends EnvMap {}
+export class EnvMapIBLIS extends EnvMap {
+  compute(computePass: GPUComputePassEncoder, device?: GPUDevice): void {
+    throw new Error("Method not implemented.");
+  }
+}
 
 export class EnvMapLoader {
-  async load(device: GPUDevice, filename: string, options?: EnvMapOptions) {
+  async load(filename: string, options?: EnvMapOptions) {
     const hdrLoader = new HDRLoader();
-    const format: GPUTextureFormat = "rgba32float";
-    const { color, width, height } = await hdrLoader.load<Float32Array>(
-      filename,
-      {
-        sRGB: false,
-        uint8: false,
-      }
-    );
-    const { mipmaps = true } = options ?? {};
-    // hdr 贴图
-    const envTexture = device.createTexture({
-      format,
-      mipLevelCount: mipmaps ? maxMipLevelCount(width, height) : 1,
-      size: [width, height],
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.COPY_SRC,
+    const result = await hdrLoader.load<Float32Array>(filename, {
+      sRGB: false,
+      uint8: false,
     });
-    device.queue.writeTexture(
-      { texture: envTexture },
-      color,
-      { bytesPerRow: width * 16 },
-      { width, height }
-    );
-    return new EnvMapBRDFIS(device, envTexture, options);
+    return new EnvMapBRDFIS(result, options);
   }
 }

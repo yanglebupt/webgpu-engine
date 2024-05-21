@@ -135,16 +135,14 @@ const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
 const light_2 = new PointLight([0, 2.2, 0], [1, 0, 0, 1], 100);
 
 const hdr_filename = `${base}image_imageBlaubeurenNight1k.hdr`;
-const envMap = await new EnvMapLoader().load(renderer.device, hdr_filename, {
-  format: renderer.format,
-});
+const envMap = await new EnvMapLoader().load(hdr_filename);
 
 async function init() {
   // 选择加载哪个模型
   const config = model_gltf_configs[settings.model_name];
 
   // 创建场景对象，并指定环境贴图
-  const scene = new Scene(renderer.device, { envMap });
+  const scene = new Scene(renderer, { envMap });
   scene.add(light);
   scene.add(light_2);
 
@@ -163,19 +161,15 @@ async function init() {
 
   // 加载 gltf 模型 或者 obj 模型
   const loader = new GLTFLoaderV2();
-  loadingBar.showLoading();
-  const model = await loader.load(renderer.device, config.path, {
-    scene,
-    format: renderer.format,
+  // loadingBar.showLoading();
+  const model = await loader.load(config.path, {
     mips: settings.mips,
-    useEnvMap: settings.envMap,
-    record: new CreateAndSetRecord(),
-    onProgress: (name: string, percentage: number) => {
-      console.log(name, percentage);
-      loadingBar.setPercentage(percentage, name);
-    },
+    // onProgress: (name: string, percentage: number) => {
+    //   loadingBar.setPercentage(percentage, name);
+    // },
   });
-  loadingBar.hiddenLoading();
+  // loadingBar.hiddenLoading();
+  scene.add(model);
   return { scene, model };
 }
 
@@ -196,17 +190,7 @@ export async function frame() {
   light_2.pos[1] = settings.posLightY;
   model.mips = settings.mips;
   model.useEnvMap = settings.envMap;
-  renderer?.render(scene, (record) => {
-    if (changed)
-      recordDom.innerHTML = `
-<div>pipelineCount: ${record.pipelineCount}</div>
-<div>pipelineSets: ${record.pipelineSets}</div>
-<div>bindGroupCount: ${record.bindGroupCount}</div>
-<div>bindGroupSets: ${record.bindGroupSets}</div>
-<div>bufferSets: ${record.bufferSets}</div>
-<div>drawCount: ${record.drawCount}</div>
-`;
-  });
+  scene.render();
   changed = false;
   requestAnimationFrame(frame);
 }

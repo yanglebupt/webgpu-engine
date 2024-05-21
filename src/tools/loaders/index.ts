@@ -1,5 +1,3 @@
-import { Scene } from "../scene";
-
 export class CreateAndSetRecord {
   // 创建了多少个 pipeline
   public pipelineCount: number = 0;
@@ -16,12 +14,7 @@ export class CreateAndSetRecord {
 }
 
 export interface BuiltRenderPipelineOptions {
-  scene: Scene;
-  format: GPUTextureFormat;
   mips?: boolean;
-  useEnvMap?: boolean;
-  depthFormat?: GPUTextureFormat;
-  record?: CreateAndSetRecord;
   onProgress?: (name: string, percentage: number) => void;
 }
 

@@ -14,6 +14,15 @@ export interface HDRLoaderOptions {
   returnRowAvgGray?: boolean; // 因为本身读取 hdr 图片就需要一行一行的解析，那么可以直接在解析的过程中计算灰度图
 }
 
+export interface HDRLoaderReturn<T> {
+  color: T;
+  gray: T;
+  row_avg: T;
+  width: number;
+  height: number;
+  avg_gray: number;
+}
+
 export class HDRLoader {
   async load<T extends Float32Array | Uint8ClampedArray | Uint8Array>(
     filename: string,
@@ -121,13 +130,6 @@ export class HDRLoader {
       width,
       height,
       avg_gray,
-    } as {
-      color: T;
-      gray: T;
-      row_avg: T;
-      width: number;
-      height: number;
-      avg_gray: number;
-    };
+    } as HDRLoaderReturn<T>;
   }
 }

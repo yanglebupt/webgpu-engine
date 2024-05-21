@@ -53,6 +53,7 @@ struct EnvUniform {
 @group(0) @binding(2) var diffuseMap: texture_2d<f32>;
 @group(0) @binding(3) var specularMap: texture_2d_array<f32>;
 @group(0) @binding(4) var<uniform> ${ENV_NAME}: EnvUniform;
+@group(0) @binding(5) var envSampler: sampler;
 `;
 
 export const MTransformationMatrixGroupBinding = /* wgsl */ `

@@ -7,7 +7,7 @@ import {
   makeStructuredView,
 } from "webgpu-utils";
 import { VPTransformationMatrixGroupBinding, VP_NAME } from "../shaders";
-import { UpdateController } from "../scene";
+import { Updatable, VirtualView } from "../scene/types";
 import Controller from "./controller";
 
 export interface Camera {
@@ -19,7 +19,7 @@ export interface Camera {
   cameraPosition: Vec3;
 }
 
-export class Camera {
+export class Camera implements VirtualView {
   static defs: ShaderDataDefinitions;
   static view: StructuredView;
   static {
@@ -68,7 +68,7 @@ export class PerspectiveCamera extends Camera {
   }
 }
 
-export class OrbitController extends UpdateController {
+export class OrbitController implements Updatable {
   arcballController: ArcballCamera;
   id = "orbitcontroller-tips";
   constructor(
@@ -76,7 +76,6 @@ export class OrbitController extends UpdateController {
     public canvas: HTMLCanvasElement,
     public options?: { zoomSpeed?: number }
   ) {
-    super();
     this.arcballController = this.createArcBallCamera(
       camera.eye,
       camera.target,

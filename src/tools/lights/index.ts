@@ -7,6 +7,7 @@ import {
 } from "webgpu-utils";
 import { Vec3, Vec4, vec3 } from "wgpu-matrix";
 import { L_NAME, LightGroupBinding } from "../shaders";
+import { VirtualView } from "../scene/types";
 
 export enum LightType {
   DIRECTION = 1,
@@ -21,7 +22,7 @@ export interface Light {
   pos?: Vec3;
 }
 
-export class Light {
+export class Light implements VirtualView {
   static defs: ShaderDataDefinitions;
   static view: (nums: number) => StructuredView;
   static getViewSize: (nums: number) => number;

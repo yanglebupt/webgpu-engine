@@ -199,7 +199,7 @@ fn main(
 
   #if ${context.hasEnvMap}
   var radiance = emissiveColor + 
-            select(vec3f(0.0), envIBL(diffuseMap,specularMap,n,v,materialSampler), bool(${M_U_NAME}.useEnvMap));
+            select(vec3f(0.0), envIBL(diffuseMap,specularMap,n,v,envSampler), bool(${M_U_NAME}.useEnvMap));
   #else
   var radiance = emissiveColor;
   #endif

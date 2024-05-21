@@ -1,34 +1,46 @@
 import { Camera, OrbitController } from "../camera";
 import { Light } from "../lights";
 import { CreateAndSetRecord } from "../loaders";
-import { GLTFScene } from "../loaders/GLTFLoader-v2";
-import { ExtendModel } from "../loaders/ObjLoader";
+import { WebGPURenderer } from "../renderer";
 import { EnvMap } from "../utils/envmap";
-
-export type Object3D = ExtendModel | GLTFScene;
-export class UpdateController {
-  update() {}
-}
+import {
+  BuildOptions,
+  Buildable,
+  Object3D,
+  Renderable,
+  Type,
+  Updatable,
+} from "./types";
 
 export interface SceneOption {
   realtime?: boolean;
   envMap?: EnvMap;
 }
 
-export class Scene {
+export class Scene implements Renderable {
+  public device: GPUDevice;
+  public buildOptions: BuildOptions;
   public bindGroupLayout: GPUBindGroupLayout;
   public bindGroup: GPUBindGroup;
   public cameras: Camera[] = [];
   public mainCamera: Camera | null = null;
   public lights: Light[] = [];
-  public buffers: (GPUBuffer | GPUTextureView)[] = [];
-  public children: Object3D[] = [];
-  public updates: UpdateController[] = [];
+  public buffers: (GPUBuffer | GPUTextureView | GPUSampler)[] = [];
+  public children: Renderable[] = [];
+  public updates: Updatable[] = [];
   public needUpdateLightBuffer: boolean = true;
   ////////////防止频繁更新light所在的bindgroup/////////////////
   public maxLight: number = 50;
   public lightCount: number = 0;
-  constructor(public device: GPUDevice, public options?: SceneOption) {
+  constructor(public renderer: WebGPURenderer, public options?: SceneOption) {
+    this.device = renderer.device;
+    this.buildOptions = {
+      device: this.device,
+      format: this.renderer.format,
+      depthFormat: this.renderer.depthFormat,
+      scene: this,
+    };
+
     const entries: GPUBindGroupLayoutEntry[] = [
       {
         binding: 0,
@@ -42,10 +54,11 @@ export class Scene {
       },
     ];
 
-    if (options?.envMap) {
-      const f32SampleType = device.features.has("float32-filterable")
-        ? "float"
-        : "unfilterable-float";
+    const envMap = options?.envMap;
+    if (envMap) {
+      envMap.build(this.buildOptions);
+      const f32SampleType = !envMap.polyfill ? "float" : "unfilterable-float";
+      const f32Type = !envMap.polyfill ? "filtering" : "non-filtering";
       entries.push({
         binding: 2,
         visibility: GPUShaderStage.FRAGMENT,
@@ -61,21 +74,27 @@ export class Scene {
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       });
-      this.buffers[2] = options.envMap.diffuseTexure.createView();
-      this.buffers[3] = options.envMap.specularTexure.createView({
+      entries.push({
+        binding: 5,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: f32Type },
+      });
+      this.buffers[2] = envMap.diffuseTexure.createView();
+      this.buffers[3] = envMap.specularTexure.createView({
         dimension: "2d-array",
       });
-      this.buffers[4] = device.createBuffer({
+      this.buffers[4] = this.device.createBuffer({
         size: EnvMap.view.arrayBuffer.byteLength,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
       });
+      this.buffers[5] = this.device.createSampler();
     }
 
-    this.bindGroupLayout = device.createBindGroupLayout({
+    this.bindGroupLayout = this.device.createBindGroupLayout({
       entries,
     });
 
-    this.buffers[0] = device.createBuffer({
+    this.buffers[0] = this.device.createBuffer({
       size: Camera.view.arrayBuffer.byteLength,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
@@ -83,13 +102,13 @@ export class Scene {
     this.bindGroup = this.makeBindGroup(1);
   }
 
-  add(obj: Object3D | UpdateController | Camera | Light) {
+  add(obj: Object3D) {
+    if (Type.isBuildable(obj)) {
+      (obj as Buildable).build(this.buildOptions);
+    }
     if (obj instanceof Camera) {
       this.cameras.push(obj);
       this.mainCamera = obj;
-    } else if (obj instanceof UpdateController) {
-      if (obj instanceof OrbitController) this.add(obj.camera);
-      this.updates.push(obj);
     } else if (obj instanceof Light) {
       this.lights.push(obj);
       this.lightCount++;
@@ -102,8 +121,13 @@ export class Scene {
           Math.floor(this.lightCount / this.maxLight) + 1
         );
       }
+    } else if (Type.isUpdatable(obj)) {
+      if (obj instanceof OrbitController) this.add(obj.camera);
+      this.updates.push(obj as Updatable);
+    } else if (Type.isRenderable(obj)) {
+      this.children.push(obj as Renderable);
     } else {
-      this.children.push(obj);
+      throw new Error(`Unsupported object type: ${Type.getClassName(obj)}`);
     }
   }
 
@@ -160,15 +184,18 @@ export class Scene {
     }
   }
 
-  render(
-    renderPass: GPURenderPassEncoder,
-    print?: (record: CreateAndSetRecord) => void
-  ) {
-    if (!this.mainCamera) return;
-    this.updates.forEach((update) => update.update());
-    this.options?.envMap?.render(renderPass, this.mainCamera);
-    this.setBuffers();
-    renderPass.setBindGroup(0, this.bindGroup);
-    this.children.forEach((child) => child.render(renderPass, print));
+  render(renderPass: GPURenderPassEncoder): void;
+  render(): void;
+  render(renderPass?: GPURenderPassEncoder) {
+    if (!renderPass) {
+      this.renderer.render(this);
+    } else {
+      if (!this.mainCamera) return;
+      this.updates.forEach((update) => update.update());
+      this.options?.envMap?.render(renderPass, this.device, this.mainCamera);
+      this.setBuffers();
+      renderPass.setBindGroup(0, this.bindGroup);
+      this.children.forEach((child) => child.render(renderPass, this.device));
+    }
   }
 }
