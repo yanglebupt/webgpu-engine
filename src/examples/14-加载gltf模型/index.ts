@@ -168,7 +168,6 @@ async function init() {
     mips: settings.mips,
     useEnvMap: settings.useEnvMap,
     onProgress: (name: string, percentage: number) => {
-      console.log(name, percentage);
       loadingBar.setPercentage(percentage, name);
     },
   });

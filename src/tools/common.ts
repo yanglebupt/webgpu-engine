@@ -51,15 +51,16 @@ export const fetchWithProgress = async (
   const response = await fetch(url);
   if (response.status >= 200 && response.status < 400) {
     const reader = response.body?.getReader();
-    const contentLength = +(response.headers.get("Content-Length") ?? 0);
+    const contentLength = +(
+      response.headers.get("Content-Length") ?? 100 * 1024 * 1024
+    );
     let receivedLength = 0;
     const chunks: Uint8Array[] = [];
     return reader
       ?.read()
       .then(function processChunk({ done, value }): Promise<Blob> | Blob {
         if (done) {
-          if (receivedLength !== contentLength)
-            throw new Error("received length is not equal to content length");
+          onProgress && onProgress(1.0);
           const data = new Uint8Array(receivedLength);
           let position = 0;
           for (let chunk of chunks) {
