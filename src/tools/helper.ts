@@ -54,6 +54,7 @@ export function createEmptyStorageTexture(
 ) {
   return device.createTexture({
     label: options?.label ?? "",
+    mipLevelCount: options?.mipLevelCount ?? 1,
     usage:
       (options?.usage ?? 0) |
       GPUTextureUsage.TEXTURE_BINDING |
@@ -345,12 +346,10 @@ export class StorageTextureToCanvas {
           },
         ],
       });
-      renderPass.setBindGroup(0, bindGroup);
       renderPass.setPipeline(renderPipeline);
+      renderPass.setBindGroup(0, bindGroup);
       renderPass.draw(3);
       renderPass.end();
-
-      return canvasReturn;
     }
 
     return canvasReturn;

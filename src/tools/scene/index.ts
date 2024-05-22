@@ -1,8 +1,12 @@
 import { Camera, OrbitController } from "../camera";
 import { Light } from "../lights";
-import { CreateAndSetRecord } from "../loaders";
 import { WebGPURenderer } from "../renderer";
-import { EnvMap } from "../utils/envmap";
+import {
+  EnvMap,
+  createSamplerByPolyfill,
+  getFilterType,
+} from "../utils/envmap";
+import { GPUSamplerCache, SolidColorTextureCache } from "./cache";
 import {
   BuildOptions,
   Buildable,
@@ -15,13 +19,16 @@ import {
 export interface SceneOption {
   realtime?: boolean;
   envMap?: EnvMap;
+  showEnvMap?: boolean;
 }
 
 export class Scene implements Renderable {
+  public polyfill: boolean;
+  public options: SceneOption;
   public device: GPUDevice;
   public buildOptions: BuildOptions;
   public bindGroupLayout: GPUBindGroupLayout;
-  public bindGroup: GPUBindGroup;
+  public bindGroup!: GPUBindGroup;
   public cameras: Camera[] = [];
   public mainCamera: Camera | null = null;
   public lights: Light[] = [];
@@ -32,13 +39,18 @@ export class Scene implements Renderable {
   ////////////防止频繁更新light所在的bindgroup/////////////////
   public maxLight: number = 50;
   public lightCount: number = 0;
-  constructor(public renderer: WebGPURenderer, public options?: SceneOption) {
+  constructor(public renderer: WebGPURenderer, options?: SceneOption) {
+    this.options = { showEnvMap: true, ...options };
     this.device = renderer.device;
     this.buildOptions = {
       device: this.device,
       format: this.renderer.format,
       depthFormat: this.renderer.depthFormat,
       scene: this,
+      cached: {
+        sampler: new GPUSamplerCache(this.device),
+        solidColorTexture: new SolidColorTextureCache(this.device),
+      },
     };
 
     const entries: GPUBindGroupLayoutEntry[] = [
@@ -54,41 +66,44 @@ export class Scene implements Renderable {
       },
     ];
 
-    const envMap = options?.envMap;
-    if (envMap) {
-      envMap.build(this.buildOptions);
-      const f32SampleType = !envMap.polyfill ? "float" : "unfilterable-float";
-      const f32Type = !envMap.polyfill ? "filtering" : "non-filtering";
-      entries.push({
-        binding: 2,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: f32SampleType },
-      });
-      entries.push({
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { viewDimension: "2d-array", sampleType: f32SampleType },
-      });
-      entries.push({
-        binding: 4,
-        visibility: GPUShaderStage.FRAGMENT,
-        buffer: { type: "uniform" },
-      });
-      entries.push({
-        binding: 5,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: f32Type },
-      });
-      this.buffers[2] = envMap.diffuseTexure.createView();
-      this.buffers[3] = envMap.specularTexure.createView({
-        dimension: "2d-array",
-      });
-      this.buffers[4] = this.device.createBuffer({
-        size: EnvMap.view.arrayBuffer.byteLength,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-      });
-      this.buffers[5] = this.device.createSampler();
-    }
+    const hasEnvMap = !!this.options.envMap;
+    if (hasEnvMap) this.options.envMap?.build(this.buildOptions);
+    this.polyfill = !this.device.features.has(EnvMap.features[0]);
+    const { sampleType, type } = getFilterType(this.polyfill);
+    entries.push({
+      binding: 2,
+      visibility: GPUShaderStage.FRAGMENT,
+      texture: { sampleType },
+    });
+    entries.push({
+      binding: 3,
+      visibility: GPUShaderStage.FRAGMENT,
+      texture: { sampleType },
+    });
+    entries.push({
+      binding: 4,
+      visibility: GPUShaderStage.FRAGMENT,
+      buffer: { type: "uniform" },
+    });
+    entries.push({
+      binding: 5,
+      visibility: GPUShaderStage.FRAGMENT,
+      sampler: { type },
+    });
+    this.buffers[2] = hasEnvMap
+      ? this.options.envMap!.diffuseTexure.createView()
+      : this.buildOptions.cached.solidColorTexture.default.createView();
+    this.buffers[3] = hasEnvMap
+      ? this.options.envMap!.specularTexure.createView()
+      : this.buildOptions.cached.solidColorTexture.default.createView();
+    this.buffers[4] = this.device.createBuffer({
+      size: EnvMap.view.arrayBuffer.byteLength,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    });
+    this.buffers[5] = createSamplerByPolyfill(
+      this.polyfill,
+      this.buildOptions.cached.sampler
+    );
 
     this.bindGroupLayout = this.device.createBindGroupLayout({
       entries,
@@ -99,7 +114,7 @@ export class Scene implements Renderable {
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
-    this.bindGroup = this.makeBindGroup(1);
+    this.makeBindGroup(1);
   }
 
   add(obj: Object3D) {
@@ -117,9 +132,7 @@ export class Scene implements Renderable {
         以 this.maxLight 为间隔，当每次超过后再进行扩容，防止频繁更新
       */
       if (this.lightCount > 1 && this.lightCount % this.maxLight == 1) {
-        this.bindGroup = this.makeBindGroup(
-          Math.floor(this.lightCount / this.maxLight) + 1
-        );
+        this.makeBindGroup(Math.floor(this.lightCount / this.maxLight) + 1);
       }
     } else if (Type.isUpdatable(obj)) {
       if (obj instanceof OrbitController) this.add(obj.camera);
@@ -136,7 +149,7 @@ export class Scene implements Renderable {
       size: Light.getViewSize(this.maxLight * size),
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
-    return this.device.createBindGroup({
+    this.bindGroup = this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: this.buffers.map((buffer, binding) => {
         if (buffer instanceof GPUBuffer) {
@@ -174,14 +187,26 @@ export class Scene implements Renderable {
       lightCollectionView.arrayBuffer.byteLength
     );
 
-    if (this.options?.envMap) {
-      EnvMap.view.set(this.options?.envMap?.getBufferView());
-      this.device.queue.writeBuffer(
-        this.buffers[4] as GPUBuffer,
-        0,
-        EnvMap.view.arrayBuffer
-      );
+    EnvMap.view.set(this.options?.envMap?.getBufferView());
+    this.device.queue.writeBuffer(
+      this.buffers[4] as GPUBuffer,
+      0,
+      EnvMap.view.arrayBuffer
+    );
+  }
+
+  set hasEnvMap(hasEnvMap: boolean) {
+    if (hasEnvMap == this.options.showEnvMap) {
+      return;
     }
+    this.options.showEnvMap = hasEnvMap;
+    this.buffers[2] = hasEnvMap
+      ? this.options.envMap!.diffuseTexure.createView()
+      : this.buildOptions.cached.solidColorTexture.default.createView();
+    this.buffers[3] = hasEnvMap
+      ? this.options.envMap!.specularTexure.createView()
+      : this.buildOptions.cached.solidColorTexture.default.createView();
+    this.makeBindGroup(1);
   }
 
   render(renderPass: GPURenderPassEncoder): void;
@@ -192,7 +217,8 @@ export class Scene implements Renderable {
     } else {
       if (!this.mainCamera) return;
       this.updates.forEach((update) => update.update());
-      this.options?.envMap?.render(renderPass, this.device, this.mainCamera);
+      if (this.options.showEnvMap)
+        this.options.envMap?.render(renderPass, this.device, this.mainCamera);
       this.setBuffers();
       renderPass.setBindGroup(0, this.bindGroup);
       this.children.forEach((child) => child.render(renderPass, this.device));

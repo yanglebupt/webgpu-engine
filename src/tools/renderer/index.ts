@@ -1,9 +1,9 @@
 import { checkWebGPUSupported, createCanvas } from "..";
 import { StorageTextureToCanvas } from "../helper";
-import { CreateAndSetRecord } from "../loaders";
 import { Scene } from "../scene";
 import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 import { EnvMap } from "../utils/envmap";
+import { getSizeForMipFromTexture } from "../utils/mipmaps";
 
 export interface WebGPURenderer {
   gpu: GPU;
@@ -64,9 +64,9 @@ export class WebGPURenderer {
     // 非实时计算，只需要一次即可
     const realtime = scene.options?.realtime ?? false;
     const envMap = scene.options?.envMap;
-    if (envMap && ((!realtime && !this.done) || realtime)) {
+    if (envMap && ((!realtime && !envMap.doned) || realtime)) {
       const computePass = encoder.beginComputePass();
-      envMap!.compute(computePass, this.device);
+      envMap.compute(computePass, this.device);
       computePass.end();
     }
     const canvasTexture = this.ctx.getCurrentTexture();
@@ -92,19 +92,31 @@ export class WebGPURenderer {
     scene.render(pass);
     pass.end();
 
-    if (envMap && !this.done) {
+    if (envMap && !envMap.doned) {
       const sc = new StorageTextureToCanvas(this.device, encoder);
+      const size = [envMap.specularTexure.width, envMap.specularTexure.height];
       sc.render(envMap.diffuseTexure, {});
-      sc.render(envMap.specularTexure, {
-        dimension: "2d",
-        baseArrayLayer: 1,
-        arrayLayerCount: 1,
-      });
+      for (
+        let baseMipLevel = 0;
+        baseMipLevel < envMap.specularTexure.mipLevelCount;
+        baseMipLevel++
+      ) {
+        const s = getSizeForMipFromTexture(size, baseMipLevel);
+        sc.render(
+          envMap.specularTexure,
+          {
+            baseMipLevel,
+            mipLevelCount: 1,
+          },
+          { width: s[0], height: s[1] }
+        );
+      }
     }
+
     this.device.queue.submit([encoder.finish()]);
     this.done = true;
     if (!realtime && envMap) {
-      envMap!.destroy();
+      envMap.done();
     }
   }
 }

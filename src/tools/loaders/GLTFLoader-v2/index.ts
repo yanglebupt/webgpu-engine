@@ -1,10 +1,5 @@
 import { Mat4, mat4 } from "wgpu-matrix";
-import {
-  BuiltRenderPipelineOptions,
-  CreateAndSetRecord,
-  SolidColorTexture,
-  SolidColorTextureView,
-} from "..";
+import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
 import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
 import { ShaderLocation, ShaderModuleCode } from "../../shaders";
 import {
@@ -18,9 +13,18 @@ import fragment, {
   MaterialUniform,
 } from "../../shaders/fragment-wgsl/pbr-light.wgsl";
 import { fetchWithProgress } from "../../common";
-import { Scene } from "../../scene";
 import { StaticTextureUtil } from "../../utils/StaticTextureUtil";
-import { BuildOptions, Buildable, Renderable } from "../../scene/types";
+import {
+  BuildCache,
+  BuildOptions,
+  Buildable,
+  Renderable,
+} from "../../scene/types";
+import {
+  GPUSamplerCache,
+  SolidColorTextureCache,
+  SolidColorTextureType,
+} from "../../scene/cache";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -329,9 +333,9 @@ export interface GLTFJSON {
 
 export class GLTFLoaderV2 {
   async load(filename: string, options?: BuiltRenderPipelineOptions) {
-    const { mips = false, onProgress } = options ?? {};
+    const { mips = false, useEnvMap = false, onProgress } = options ?? {};
     const buffer = await (await fetchWithProgress(filename, (percentage) => {
-      onProgress && onProgress("downloading", 0.2 * percentage);
+      onProgress && onProgress("downloading", 0.7 * percentage);
     })!)!.arrayBuffer();
     // 解析 Header 和 Json Chunk Header
     const header = new Uint32Array(buffer, 0, 5);
@@ -398,12 +402,13 @@ export class GLTFLoaderV2 {
       ) ?? [];
     // 解析
     const materials =
-      json.materials?.map((material) => new GLTFMaterial(material, textures)) ??
-      [];
+      json.materials?.map(
+        (material) => new GLTFMaterial(material, textures, useEnvMap)
+      ) ?? [];
 
     const meshes = json.meshes.map((mesh, idx) => {
       onProgress &&
-        onProgress("parse mesh", 0.2 + ((idx + 1) / json.meshes.length) * 0.1);
+        onProgress("parse mesh", 0.7 + ((idx + 1) / json.meshes.length) * 0.1);
       const primitives = mesh.primitives.map((primitive) => {
         let topology = primitive.mode;
         if (topology === undefined) topology = GLTFRenderMode.TRIANGLES;
@@ -447,7 +452,7 @@ export class GLTFLoaderV2 {
         onProgress &&
           onProgress(
             "parse nodes",
-            0.3 + ((idx + 1) / defaultScene.nodes.length) * 0.1
+            0.95 + ((idx + 1) / defaultScene.nodes.length) * 0.05 // 最后一下的进度要尽可能快，这样才能确保进度条及时消失
           );
         const node = json.nodes[nodeIdx];
         const flattenedNodeMesh = flattenTree(
@@ -475,8 +480,9 @@ export class GLTFLoaderV2 {
         bufferViews,
         images,
         samplers,
+        materials,
       },
-      { mips }
+      { mips, useEnvMap }
     );
     return gltfScene;
   }
@@ -525,8 +531,8 @@ export interface GLTFScene {
 }
 export class GLTFScene implements Renderable, Buildable {
   public record: CreateAndSetRecord;
-  private _mips: boolean = false;
-  private _useEnvMap: boolean = false;
+  private _mips: boolean;
+  private _useEnvMap: boolean;
   constructor(
     public a_nodes: GLTFFlattenNode[],
     public a_meshs: GLTFMesh[],
@@ -535,20 +541,28 @@ export class GLTFScene implements Renderable, Buildable {
       images: GLTFImage[];
       samplers: GLTFSampler[];
       bufferViews: GLTFBufferView[];
+      materials: GLTFMaterial[];
     },
-    options?: { mips: boolean }
+    options?: { mips: boolean; useEnvMap: boolean }
   ) {
     Object.assign(this, scene);
     this.record = new CreateAndSetRecord();
     this.renderPipelines = new Map();
     this._mips = options?.mips ?? false;
+    this._useEnvMap = options?.useEnvMap ?? false;
   }
 
-  upload(device: GPUDevice) {
-    GLTFSampler.createDefaultSampler(device);
-    SolidColorTexture.upload(device);
-    const { images, samplers, bufferViews } = this.resources;
-    samplers.forEach((sampler) => sampler.uploadSampler(device));
+  upload(device: GPUDevice, cached: BuildCache) {
+    const {
+      sampler: samplerCached,
+      solidColorTexture: solidColorTextureCached,
+    } = cached;
+    GLTFSampler.createDefaultSampler(samplerCached);
+    const { images, samplers, bufferViews, materials } = this.resources;
+    materials.forEach((material) =>
+      material.uploadSolidColorTexture(solidColorTextureCached)
+    );
+    samplers.forEach((sampler) => sampler.uploadSampler(samplerCached));
     bufferViews.forEach(
       (view) =>
         view.flag === GLTFBufferViewFlag.BUFFER && view.uploadBuffer(device)
@@ -557,9 +571,9 @@ export class GLTFScene implements Renderable, Buildable {
   }
 
   // 创建 render-order
-  build({ device, format, depthFormat, scene }: BuildOptions) {
+  build({ device, format, depthFormat, scene, cached }: BuildOptions) {
     this.device = device;
-    this.upload(device);
+    this.upload(device, cached);
     // new group  假设所有的 node 都使用同一个 bindGroupLayout
     this.nodeBindGroupLayout = device.createBindGroupLayout({
       label: "nodeBindGroupLayout",
@@ -593,7 +607,7 @@ export class GLTFScene implements Renderable, Buildable {
     });
 
     const bindGroupLayouts = [scene.bindGroupLayout];
-    const hasEnvMap = !!scene.options?.envMap;
+    const polyfill = scene.polyfill;
     // 多个 node 可以重复用同一个 mesh (primitives, primitive)，但 bindGroup 不同
     // 因此需要记录使用 primitive 的 node 的 bindGroup 数组  1 对 多
     const primitiveNodesMap: Map<string, RenderNodeMatrix[]> = new Map();
@@ -643,7 +657,7 @@ export class GLTFScene implements Renderable, Buildable {
     this.a_meshs.forEach((a_mesh) => {
       a_mesh.a_primitives.forEach((a_primitive) => {
         const { gpuBuffers, indices, pipelineCacheKey, vertexCount } =
-          a_primitive.makeBuffers(hasEnvMap);
+          a_primitive.makeBuffers(polyfill);
         const materialKey = JSON.stringify(a_primitive.a_material?.__json);
         let material = materialCache.get(materialKey);
         if (!material) {
@@ -984,7 +998,7 @@ export class GLTFPrimitive {
     this.defs = makeShaderDataDefinitions(MaterialUniform);
   }
 
-  makeBuffers(envMap: boolean) {
+  makeBuffers(polyfill: boolean) {
     const primitive: GPUPrimitiveState = { topology: "triangle-list" };
     if (this.topology == GLTFRenderMode.TRIANGLE_STRIP) {
       primitive.topology = "triangle-strip";
@@ -1005,7 +1019,7 @@ export class GLTFPrimitive {
             useAlphaCutoff: alphaMode == "MASK",
           },
           fragment: {
-            hasEnvMap: envMap,
+            polyfill,
           },
         },
       }),
@@ -1300,20 +1314,13 @@ export class GLTFSampler {
     Object.assign(this, sampler);
   }
 
-  static createDefaultSampler(device: GPUDevice) {
+  static createDefaultSampler(cached: GPUSamplerCache) {
     if (!GLTFSampler.defaultSampler) {
-      GLTFSampler.defaultSampler = device.createSampler({
-        addressModeU: "repeat",
-        addressModeV: "repeat",
-        minFilter: "linear",
-        magFilter: "linear",
-        mipmapFilter: "linear",
-      });
+      GLTFSampler.defaultSampler = cached.default;
     }
   }
 
-  uploadSampler(device: GPUDevice) {
-    GLTFSampler.createDefaultSampler(device);
+  uploadSampler(cached: GPUSamplerCache) {
     const descriptor: GPUSamplerDescriptor = {
       addressModeU: this.addressModeForWrap(this.wrapS),
       addressModeV: this.addressModeForWrap(this.wrapT),
@@ -1339,7 +1346,7 @@ export class GLTFSampler {
         descriptor.mipmapFilter = "linear";
         break;
     }
-    this.sampler = device.createSampler(descriptor);
+    this.sampler = cached.get(descriptor);
   }
 
   addressModeForWrap(wrap?: GLTFSamplerWrapType) {
@@ -1357,7 +1364,11 @@ export class GLTFSampler {
 export class GLTFTexture {
   constructor(
     texture: GLTFTexture,
-    public a_image: GLTFImage | { view: SolidColorTextureView },
+    public a_image:
+      | GLTFImage
+      | {
+          view: { texture: GPUTexture };
+        },
     public a_sampler: GLTFSampler | null
   ) {
     Object.assign(this, texture);
@@ -1366,48 +1377,69 @@ export class GLTFTexture {
 export class GLTFMaterial {
   textures: GLTFTexture[] = [];
   samplers: (GLTFSampler | null)[] = [];
-  useEnvMap: boolean = false;
-  constructor(public __json: GLTFMaterial, textures: GLTFTexture[]) {
+  constructor(
+    public __json: GLTFMaterial,
+    public a_textures: GLTFTexture[],
+    public useEnvMap: boolean
+  ) {
     Object.assign(this, __json);
+  }
+
+  uploadSolidColorTexture(cached: SolidColorTextureCache) {
     // 值
     const preferredFormat = StaticTextureUtil.renderFormat.split("-")[0];
     // 贴图和采样器
-    this.textures = [
-      {
-        a: this.pbrMetallicRoughness.baseColorTexture,
-        d: SolidColorTexture.opaqueWhiteTexture,
-        f: `${preferredFormat}-srgb`,
-      },
-      {
-        a: this.normalTexture,
-        d: SolidColorTexture.defaultNormalTexture,
-        f: preferredFormat,
-      },
-      {
-        a: this.pbrMetallicRoughness.metallicRoughnessTexture,
-        d: SolidColorTexture.opaqueWhiteTexture,
-        f: preferredFormat,
-      },
-      {
-        a: this.emissiveTexture,
-        d: SolidColorTexture.transparentBlackTexture,
-        f: `${preferredFormat}-srgb`,
-      },
-      {
-        a: this.occlusionTexture,
-        d: SolidColorTexture.transparentBlackTexture,
-        f: preferredFormat,
-      },
-    ].map(({ a, d, f }) => {
-      const res =
-        a?.index !== undefined
-          ? textures[a?.index]
-          : new GLTFTexture(
-              { source: -1, sampler: -1 } as any,
-              { view: d },
-              null
-            );
-      res.a_image.view.setFormat(f as GPUTextureFormat);
+    this.textures = (
+      [
+        {
+          a: this.pbrMetallicRoughness.baseColorTexture,
+          d: "opaqueWhiteTexture",
+          f: `${preferredFormat}-srgb`,
+        },
+        {
+          a: this.normalTexture,
+          d: "defaultNormalTexture",
+          f: preferredFormat,
+        },
+        {
+          a: this.pbrMetallicRoughness.metallicRoughnessTexture,
+          d: "opaqueWhiteTexture",
+          f: preferredFormat,
+        },
+        {
+          a: this.emissiveTexture,
+          d: "transparentBlackTexture",
+          f: `${preferredFormat}-srgb`,
+        },
+        {
+          a: this.occlusionTexture,
+          d: "transparentBlackTexture",
+          f: preferredFormat,
+        },
+      ] as Array<{
+        a: { index?: number };
+        d: SolidColorTextureType;
+        f: GPUTextureFormat;
+      }>
+    ).map(({ a, d, f }) => {
+      const notUseDefault = a?.index !== undefined;
+      const res = notUseDefault
+        ? this.a_textures[a?.index!]
+        : new GLTFTexture(
+            { source: -1, sampler: -1 } as any,
+            {
+              view: {
+                texture: cached.get({
+                  format: f,
+                  type: d,
+                }),
+              },
+            },
+            null
+          );
+      if (notUseDefault) {
+        (res.a_image as GLTFImage).view.setFormat(f);
+      }
       if (!this.samplers.includes(res.a_sampler))
         this.samplers.push(res.a_sampler);
       return res;

@@ -30,7 +30,9 @@ fn textureUV(id: vec2u, size: vec2u) -> vec2f {
 fn texturePixel(uv: vec2f, size: vec2u) -> vec2u {
   return vec2u(uv * vec2f(size) - 0.5);
 }
+`;
 
+export const textureGrid = /*wgsl*/ `
 fn textureGrid(uv: vec2f, size: vec2u) -> vec4f {
   let pixel_center = uv * vec2f(size) - 0.5;
   let grid = vec2f(vec2u(pixel_center));
@@ -42,6 +44,51 @@ fn textureGrid(uv: vec2f, size: vec2u) -> vec4f {
   return vec4f(grid, gsp);
 }
 `;
+
+export const textureFilter = (polyfill: boolean, samplerName: string) => {
+  return polyfill
+    ? /*wgsl*/ `
+${textureGrid}
+
+fn biFilter(left_bottom: vec4f, left_top: vec4f, right_bottom: vec4f, right_top: vec4f, gap: vec2f) -> vec4f {
+  let a = mix(left_bottom, left_top, gap.y);
+  let b = mix(right_bottom, right_top, gap.y);
+  return mix(a, b, gap.x);
+}
+
+fn textureLevel(map: texture_2d<f32>, uv: vec2f, level: u32) -> vec4f {
+  // remap to mip size
+  let mip_size = textureDimensions(map, level);
+  let grid = textureGrid(uv, mip_size);
+  let left_bottom = vec2u(grid.xy);
+  let left_top = left_bottom + vec2u(0u, 1u);  // 会自动截断，或者返回 0，因此不需要手动截断
+  let right_bottom = left_bottom + vec2u(1u, 0u); 
+  let right_top = left_bottom + vec2u(1u, 1u); 
+  let gap = grid.zw;
+
+  let res1 = textureLoad(map, left_bottom, level);
+  let res2 = textureLoad(map, left_top, level);
+  let res3 = textureLoad(map, right_bottom, level);
+  let res4 = textureLoad(map, right_top, level);
+  
+  let res = biFilter(res1, res2, res3, res4, gap);
+  return res;
+}
+
+fn texture(map: texture_2d<f32>, uv: vec2f, mipLevel: f32) -> vec4f {
+  let level = u32(mipLevel);
+  let res1 = textureLevel(map, uv, level);
+  let res2 = textureLevel(map, uv, level+1u);
+  let gap = mipLevel - f32(level);
+  let res = mix(res1, res2, gap);
+  return res;
+}`
+    : /*wgsl*/ `
+fn texture(map: texture_2d<f32>, uv: vec2f, mipLevel: f32) -> vec4f {
+  return textureSampleLevel(map, ${samplerName}, uv, mipLevel); 
+}
+`;
+};
 
 export const Coord = /* wgsl */ `
 fn SphereCoord2Dir(phi: f32, theta: f32) -> vec3f {

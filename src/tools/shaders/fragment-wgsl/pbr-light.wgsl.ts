@@ -6,7 +6,7 @@ import {
   LightGroupBinding,
   ShaderContext,
 } from "..";
-import { Coord } from "../utils";
+import { Coord, textureFilter } from "../utils";
 
 export const M_U_NAME = "material";
 export const MaterialUniform = /* wgsl */ `
@@ -25,7 +25,8 @@ struct Material {
 @group(2) @binding(0) var<uniform> ${M_U_NAME}: Material;
 `;
 
-export default (context: ShaderContext) => wgsl/* wgsl */ `
+export default (context: ShaderContext) => {
+  return wgsl/* wgsl */ `
 
 const PI = 3.141592653589793;
 const RECIPROCAL_PI = 0.3183098861837907;
@@ -35,9 +36,7 @@ const ESP = 0.001;
 const reflectance = 0.5;
 
 ${LightGroupBinding}
-#if ${context.hasEnvMap}
 ${EnvMapGroupBinding}
-#endif
 ${MaterialUniform}
 // 贴图
 @group(2) @binding(1) var baseColorTexture: texture_2d<f32>;
@@ -152,15 +151,16 @@ fn radiance_render(brdf: vec3f, ir: vec3f) -> vec3f {
   return brdf * ir;
 }
 
-#if ${context.hasEnvMap}
+${textureFilter(context.polyfill, "envSampler")}
+
 ${Coord}
-fn envIBL(diffuseMap: texture_2d<f32>, specularMap: texture_2d_array<f32>, 
-          n: vec3f, v: vec3f, _sampler: sampler) -> vec3f {
+fn envIBL(diffuseMap: texture_2d<f32>, specularMap: texture_2d<f32>, roughness: f32,
+          n: vec3f, v: vec3f) -> vec3f {
 
   let r_v = reflect(-v, n);
   // linear
-  let env_diff = textureSample(diffuseMap,_sampler,Dir2SphereTexCoord(n)).rgb;
-  let env_spec = textureSample(specularMap,_sampler,Dir2SphereTexCoord(r_v),0u).rgb;
+  let env_diff = texture(diffuseMap,Dir2SphereTexCoord(n),0.0).rgb;
+  let env_spec = texture(specularMap,Dir2SphereTexCoord(r_v),roughness*${ENV_NAME}.specularDetails).rgb;
   let rho_d =  ${ENV_NAME}.diffuseFactor * rgb2lin(${ENV_NAME}.diffuseColor.rgb);
   let rho_s = ${ENV_NAME}.specularFactor * rgb2lin(${ENV_NAME}.specularColor.rgb);
   
@@ -171,7 +171,6 @@ fn envIBL(diffuseMap: texture_2d<f32>, specularMap: texture_2d_array<f32>,
   }
   return radiance;
 }
-#endif
 
 fn textureSample_rgb2lin(texture: texture_2d<f32>, _sampler: sampler, uv: vec2f) -> vec4f {
   let col = textureSample(texture, _sampler, uv);
@@ -197,12 +196,8 @@ fn main(
                 applyNormalMap(textureSample(normalTexture, materialSampler, uv0).xyz, uv0, normalize(norm), v),
                 bool(${M_U_NAME}.applyNormalMap));
 
-  #if ${context.hasEnvMap}
   var radiance = emissiveColor + 
-            select(vec3f(0.0), envIBL(diffuseMap,specularMap,n,v,envSampler), bool(${M_U_NAME}.useEnvMap));
-  #else
-  var radiance = emissiveColor;
-  #endif
+            select(vec3f(0.0), envIBL(diffuseMap,specularMap,roughness,n,v), bool(${M_U_NAME}.useEnvMap));
   ///////////////////////////////////////////
   for(var i=0u; i<${L_NAME}.lightNums; i++){
     let in_light = ${L_NAME}.lights[i];
@@ -236,3 +231,4 @@ fn main(
   return vec4f(rgb, baseColor.a);
 }
 `;
+};

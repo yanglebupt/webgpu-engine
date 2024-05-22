@@ -102,7 +102,8 @@ const settings = {
   flux: 10.0,
   posLightY: 2.2,
   mips: false,
-  envMap: true,
+  hasEnvMap: true,
+  useEnvMap: true,
 };
 const gui = new GUI();
 gui
@@ -111,7 +112,8 @@ gui
 gui.add(settings, "flux", 1, 40);
 gui.add(settings, "posLightY", 0, 5).name("点光源 Y 位置"); // 后面我们会将物体平移到原点，这样就能看清点光源的移动了
 gui.add(settings, "mips");
-gui.add(settings, "envMap");
+gui.add(settings, "hasEnvMap");
+gui.add(settings, "useEnvMap");
 
 const parentDom = document.createElement("div");
 parentDom.id = "canvas-parent";
@@ -142,7 +144,9 @@ async function init() {
   const config = model_gltf_configs[settings.model_name];
 
   // 创建场景对象，并指定环境贴图
-  const scene = new Scene(renderer, { envMap });
+  const scene = new Scene(renderer, {
+    envMap: settings.hasEnvMap ? envMap : undefined,
+  });
   scene.add(light);
   scene.add(light_2);
 
@@ -161,14 +165,16 @@ async function init() {
 
   // 加载 gltf 模型 或者 obj 模型
   const loader = new GLTFLoaderV2();
-  // loadingBar.showLoading();
+  loadingBar.showLoading();
   const model = await loader.load(config.path, {
     mips: settings.mips,
-    // onProgress: (name: string, percentage: number) => {
-    //   loadingBar.setPercentage(percentage, name);
-    // },
+    useEnvMap: settings.useEnvMap,
+    onProgress: (name: string, percentage: number) => {
+      console.log(name, percentage);
+      loadingBar.setPercentage(percentage, name);
+    },
   });
-  // loadingBar.hiddenLoading();
+  loadingBar.hiddenLoading();
   scene.add(model);
   return { scene, model };
 }
@@ -189,7 +195,8 @@ export async function frame() {
   light.flux = settings.flux;
   light_2.pos[1] = settings.posLightY;
   model.mips = settings.mips;
-  model.useEnvMap = settings.envMap;
+  model.useEnvMap = settings.useEnvMap;
+  scene.hasEnvMap = settings.hasEnvMap;
   scene.render();
   changed = false;
   requestAnimationFrame(frame);

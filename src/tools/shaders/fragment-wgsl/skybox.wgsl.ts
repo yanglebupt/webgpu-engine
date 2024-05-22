@@ -1,6 +1,7 @@
-import { Coord } from "../utils";
+import { wgsl } from "wgsl-preprocessor";
+import { textureFilter } from "../utils";
 
-export default () => /*wgsl*/ `
+export default (polyfill: boolean) => wgsl/*wgsl*/ `
 
 const PI = 3.141592653589793;
 
@@ -25,10 +26,12 @@ fn Dir2SphereTexCoord(dir: vec3f) -> vec2f {
   return vec2f(s, t);
 }
 
+${textureFilter(polyfill, "ourSampler")}
+
 @fragment
 fn main(@location(1) pos: vec4f) -> @location(0) vec4f {
   let t = uni.viewDirectionProjectionInverse * pos;
   let n_t  = normalize(t.xyz / t.w) * vec3f(1.0, -1.0, 1.0);
-  return textureSample(ourTexture, ourSampler, Dir2SphereTexCoord(n_t));
+  return texture(ourTexture, Dir2SphereTexCoord(n_t), 0.0);
 }
 `;

@@ -8,6 +8,40 @@ export const waitUnitCondition = (gasp: number, conditionFn: () => boolean) =>
       }
     }, gasp);
   });
+// 迭代器装封装数组方法
+
+export class Iter {
+  static list<T>(iter: IterableIterator<T>) {
+    const list: T[] = [];
+    let _done: boolean | undefined = false;
+    while (!_done) {
+      const { value, done } = iter.next();
+      !done && list.push(value);
+      _done = done;
+    }
+    return list;
+  }
+  static filter<T>(iter: IterableIterator<T>, filter: (value: T) => boolean) {
+    const list: T[] = [];
+    let _done: boolean | undefined = false;
+    while (!_done) {
+      const { value, done } = iter.next();
+      !done && filter(value) && list.push(value);
+      _done = done;
+    }
+    return list;
+  }
+  static map<T, B>(iter: IterableIterator<T>, map: (value: T) => B) {
+    const list: B[] = [];
+    let _done: boolean | undefined = false;
+    while (!_done) {
+      const { value, done } = iter.next();
+      !done && list.push(map(value));
+      _done = done;
+    }
+    return list;
+  }
+}
 
 // 带有进度的 fetch
 export const fetchWithProgress = async (

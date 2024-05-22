@@ -1,4 +1,5 @@
 import { Scene } from ".";
+import { GPUSamplerCache, SolidColorTextureCache } from "./cache";
 
 export class Type {
   static getClassName(obj: Object) {
@@ -40,10 +41,16 @@ export interface VirtualView {
   需要构建 pipeline 的对象，包括 render 和 compute pipeline，在添加的时候，由 scene 负责调用构建
   examples: EnvMap, GLTFScene
 */
+export interface BuildCache {
+  sampler: GPUSamplerCache;
+  solidColorTexture: SolidColorTextureCache;
+  pipeline?: GPURenderPipeline;
+}
 export interface BuildOptions {
   device: GPUDevice;
   format: GPUTextureFormat;
   depthFormat: GPUTextureFormat;
+  cached: BuildCache;
   scene: Scene;
 }
 export interface Buildable {

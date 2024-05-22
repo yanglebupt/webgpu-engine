@@ -8,7 +8,7 @@ import { createComputePipeline, createRenderPipeline } from "../..";
 import { createEmptyStorageTexture } from "../../helper";
 import { HDRLoader, HDRLoaderReturn } from "../../loaders/HDRLoader";
 import { DispatchCompute } from "../Dispatch";
-import { MipMap, maxMipLevelCount } from "../mipmaps";
+import { MipMap, getSizeForMipFromTexture, maxMipLevelCount } from "../mipmaps";
 import IBL_BRDF_IS from "./shader/ibl-brdf-is.wgsl";
 import { ENV_NAME, EnvMapGroupBinding } from "../../shaders";
 import { Vec3, Vec4, mat4 } from "wgpu-matrix";
@@ -23,6 +23,7 @@ import {
   Renderable,
   VirtualView,
 } from "../../scene/types";
+import { GPUSamplerCache } from "../../scene/cache";
 
 export interface EnvMapPartOptions {
   mipLevel?: number;
@@ -51,12 +52,29 @@ export interface EnvMap {
   texture: GPUTexture;
   diffuseTexure: GPUTexture;
   specularTexure: GPUTexture;
-  destroyed: boolean;
-  destroy(): void;
+  doned: boolean;
+  done(): void;
 
   renderPipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
   uniformBuffer: GPUBuffer;
+  sampler: GPUSampler;
+}
+
+export function getFilterType(polyfill: boolean) {
+  const filtered = !polyfill;
+  const sampleType: GPUTextureSampleType = filtered
+    ? "float"
+    : "unfilterable-float";
+  const type: GPUSamplerBindingType = filtered ? "filtering" : "non-filtering";
+  return { sampleType, type };
+}
+
+export function createSamplerByPolyfill(
+  polyfill: boolean,
+  cached: GPUSamplerCache
+) {
+  return polyfill ? cached.get({}) : cached.default;
 }
 
 export abstract class EnvMap
@@ -96,11 +114,14 @@ export abstract class EnvMap
     device,
     format,
     depthFormat = StaticTextureUtil.depthFormat,
+    cached,
   }: BuildOptions) {
     const { color, width, height } = this.hdrReturn;
     const { mipmaps = true } = this.options ?? {};
     const _format: GPUTextureFormat = "rgba32float";
     this.polyfill = !device.features.has("float32-filterable");
+
+    this.sampler = createSamplerByPolyfill(this.polyfill, cached.sampler);
 
     // hdr 贴图
     this.texture = device.createTexture({
@@ -125,22 +146,50 @@ export abstract class EnvMap
       width,
       height,
     ]);
-    const details = this.options?.specular?.roughnessDetail ?? 3;
-    console.log(`roughnessDetail: ${details}`);
-    this.specularTexure = createEmptyStorageTexture(device, _format, [
-      width,
-      height,
-      details,
-    ]);
+    this.specularTexure = createEmptyStorageTexture(
+      device,
+      _format,
+      [width, height],
+      {
+        mipLevelCount: Math.min(
+          this.texture.mipLevelCount,
+          this.options?.specular?.roughnessDetail ?? 5
+        ),
+      }
+    );
 
     // 渲染管线
+    const { sampleType, type } = getFilterType(this.polyfill);
     this.renderPipeline = createRenderPipeline(
-      vertex(true),
-      fragment(),
+      vertex(),
+      fragment(this.polyfill),
       device,
       format,
       [null],
       {
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            device.createBindGroupLayout({
+              entries: [
+                {
+                  binding: 0,
+                  visibility: GPUShaderStage.FRAGMENT,
+                  buffer: { type: "uniform" },
+                },
+                {
+                  binding: 1,
+                  visibility: GPUShaderStage.FRAGMENT,
+                  sampler: { type },
+                },
+                {
+                  binding: 2,
+                  visibility: GPUShaderStage.FRAGMENT,
+                  texture: { sampleType },
+                },
+              ],
+            }),
+          ],
+        }),
         depthStencil: {
           format: depthFormat,
           depthWriteEnabled: true,
@@ -148,7 +197,6 @@ export abstract class EnvMap
         },
       }
     );
-    const sampler = device.createSampler();
     this.uniformBuffer = device.createBuffer({
       size: 4 * 4 * 4,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
@@ -157,7 +205,7 @@ export abstract class EnvMap
       layout: this.renderPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: sampler },
+        { binding: 1, resource: this.sampler },
         { binding: 2, resource: this.texture.createView() },
       ],
     });
@@ -169,6 +217,7 @@ export abstract class EnvMap
       specularColor: this.options?.specularColor ?? [1, 1, 1, 1],
       diffuseFactor: this.options?.diffuseFactor ?? [0.2, 0.2, 0.2],
       specularFactor: this.options?.specularFactor ?? [0.2, 0.2, 0.2],
+      specularDetails: this.specularTexure.mipLevelCount,
     };
   }
 
@@ -186,8 +235,7 @@ export abstract class EnvMap
 }
 
 export class EnvMapBRDFIS extends EnvMap {
-  public mipmapFilterTexture?: GPUTexture;
-  public sampler?: GPUSampler;
+  public hasGeneratedMips = false;
   constructor(
     hdrReturn: HDRLoaderReturn<Float32Array>,
     options?: EnvMapOptions
@@ -195,48 +243,32 @@ export class EnvMapBRDFIS extends EnvMap {
     super(hdrReturn, options);
   }
 
-  destroy() {
-    if (this.destroyed) return;
-    this.mipmapFilterTexture?.destroy();
-    this.mipmapFilterTexture = undefined;
-    this.destroyed = true;
+  done() {
+    if (this.doned) return;
+    this.doned = true;
   }
 
   compute(computePass: GPUComputePassEncoder, device: GPUDevice) {
-    const mipmap = new MipMap(device, computePass);
-    mipmap.generateMipmaps(this.texture);
+    if (!this.hasGeneratedMips) {
+      const mipmap = new MipMap(device, computePass);
+      mipmap.generateMipmaps(this.texture);
+      this.hasGeneratedMips = true;
+    }
     const mipLevels = [
       this.options?.diffuse?.mipLevel ?? 6,
       this.options?.specular?.mipLevel ?? 4,
     ] as [number, number];
-    if (this.polyfill) {
-      console.log("float32-filterable unsupported, try use polyfill");
-      ////////////////提取 mipmap 后的贴图/////////////////
-      this.mipmapFilterTexture = createEmptyStorageTexture(
-        device,
-        this.texture.format,
-        [this.texture.width, this.texture.height, mipLevels.length]
-      );
-      mipmap.extractMipmap(this.texture, {
-        texture: this.mipmapFilterTexture,
-        mipLevels,
-      });
-    } else {
-      console.log("float32-filterable supported");
-      this.sampler = device.createSampler({
-        minFilter: "linear",
-        magFilter: "linear",
-      });
-    }
-    const { pipeline, bindGroup, dispatchSize } =
+    const { pipeline, createBindGroup, dispatchSize, roughnesses } =
       this.build_IBL_BRDF_IS_ComputePass(device, mipLevels);
     computePass.setPipeline(pipeline);
-    computePass.setBindGroup(0, bindGroup);
-    computePass.dispatchWorkgroups(
-      dispatchSize[0],
-      dispatchSize[1],
-      dispatchSize[2]
-    );
+    for (let i = 0; i < roughnesses.length; i++) {
+      computePass.setBindGroup(0, createBindGroup(i));
+      const _ds = getSizeForMipFromTexture(
+        [dispatchSize[1], dispatchSize[2]],
+        i
+      );
+      computePass.dispatchWorkgroups(1, _ds[0], _ds[1]);
+    }
   }
 
   generateRoughness(details: number) {
@@ -251,10 +283,10 @@ export class EnvMapBRDFIS extends EnvMap {
     device: GPUDevice,
     mipLevels: [number, number]
   ) {
+    const details = this.specularTexure.mipLevelCount;
+    console.log(`roughness details: ${details}`);
     const { width, height, format } = this.texture;
-    const roughnesses = this.generateRoughness(
-      this.specularTexure!.depthOrArrayLayers
-    );
+    const roughnesses = this.generateRoughness(details);
     const samplers = this.options?.samplers ?? 512;
     const { chunkSize, dispatchSize, order } =
       DispatchCompute.dispatchImageAndSampler(
@@ -265,48 +297,114 @@ export class EnvMapBRDFIS extends EnvMap {
     console.log(
       `sample chunk size: ${chunkSize}, sample dispatch size: ${dispatchSize}, order: ${order}`
     );
+
+    const { sampleType, type } = getFilterType(this.polyfill);
+
+    console.log(
+      `float32-filterable ${this.polyfill ? "not" : ""} supported`,
+      sampleType,
+      type,
+      this.polyfill ? "use polyfill" : ""
+    );
+
     const pipeline = createComputePipeline(
       IBL_BRDF_IS(
         this.polyfill,
         format,
         mipLevels,
-        roughnesses,
         chunkSize,
         dispatchSize[order[2]],
         order,
         this.options?.diffuse?.INT ?? 1e4,
         this.options?.specular?.INT ?? 1e4
       ),
-      device
-    );
-    dispatchSize[order[2]] = roughnesses.length;
-    const entries: GPUBindGroupEntry[] = [
+      device,
       {
-        binding: 0,
-        resource: this.polyfill
-          ? this.mipmapFilterTexture!.createView({
-              dimension: "2d-array",
-            })
-          : this.texture.createView(),
-      },
-      { binding: 1, resource: this.diffuseTexure.createView() },
-      {
-        binding: 2,
-        resource: this.specularTexure!.createView({
-          dimension: "2d-array",
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            device.createBindGroupLayout({
+              entries: [
+                {
+                  binding: 0,
+                  visibility: GPUShaderStage.COMPUTE,
+                  texture: { sampleType },
+                },
+                {
+                  binding: 1,
+                  visibility: GPUShaderStage.COMPUTE,
+                  storageTexture: { access: "write-only", format },
+                },
+                {
+                  binding: 2,
+                  visibility: GPUShaderStage.COMPUTE,
+                  storageTexture: {
+                    access: "write-only",
+                    format,
+                  },
+                },
+                {
+                  binding: 3,
+                  visibility: GPUShaderStage.COMPUTE,
+                  sampler: {
+                    type,
+                  },
+                },
+                {
+                  binding: 4,
+                  visibility: GPUShaderStage.COMPUTE,
+                  buffer: { type: "uniform" },
+                },
+              ],
+            }),
+          ],
         }),
-      },
-    ];
-    if (!this.polyfill)
-      entries.push({
-        binding: 3,
-        resource: this.sampler!,
+      }
+    );
+    const createBindGroup = (baseMipLevel: number) => {
+      const buffer = device.createBuffer({
+        size: 4,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
       });
-    const bindGroup = device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: entries,
-    });
-    return { pipeline, bindGroup, dispatchSize };
+      device.queue.writeBuffer(
+        buffer,
+        0,
+        new Float32Array([roughnesses[baseMipLevel]])
+      );
+      return device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: this.texture.createView(),
+          },
+          {
+            binding: 1,
+            resource: this.diffuseTexure.createView(),
+          },
+          {
+            binding: 2,
+            resource: this.specularTexure.createView({
+              mipLevelCount: 1,
+              baseMipLevel,
+            }),
+          },
+          {
+            binding: 3,
+            resource: this.sampler,
+          },
+          {
+            binding: 4,
+            resource: { buffer },
+          },
+        ],
+      });
+    };
+    return {
+      pipeline,
+      createBindGroup,
+      dispatchSize,
+      roughnesses,
+    };
   }
 }
 

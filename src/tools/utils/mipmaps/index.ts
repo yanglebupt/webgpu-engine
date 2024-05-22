@@ -3,6 +3,13 @@ import { createComputePipeline } from "../..";
 import { DispatchCompute } from "../Dispatch";
 import extract_mimmap from "./shaders/extract-mipmap.wgsl";
 
+export function getSizeForMipFromTexture(
+  size: [number, number] | number[],
+  mipLevel: number
+) {
+  return size.map((v) => Math.max(1, Math.floor(v / 2 ** mipLevel)));
+}
+
 export class MipMap {
   public computePass: GPUComputePassEncoder;
   public needEndPass: boolean;

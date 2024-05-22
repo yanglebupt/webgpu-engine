@@ -24,10 +24,6 @@ export class LoaderBarDomElement {
     this.bar = document.querySelector(
       ".bar-container .progress"
     ) as HTMLElement;
-    this.bar.style.setProperty(
-      "transition-duration",
-      `${this.transitionDuration}s`
-    );
     this.text = document.querySelector(".bar-container .tip") as HTMLElement;
     // 修改监听
     const mob = new MutationObserver((mutations) => {
@@ -67,6 +63,6 @@ export class LoaderBarDomElement {
   /* 需要在页面更新后回调 */
   async nextTick(callback: () => void) {
     await waitUnitCondition(10, () => this.canHidden);
-    setTimeout(callback, (this.transitionDuration + 0.1) * 1000);
+    setTimeout(callback);
   }
 }
