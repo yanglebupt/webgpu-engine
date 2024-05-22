@@ -67,7 +67,8 @@ export class Scene implements Renderable {
     ];
 
     const hasEnvMap = !!this.options.envMap;
-    if (hasEnvMap) this.options.envMap?.build(this.buildOptions);
+    if (hasEnvMap && !this.options.envMap?.doned)
+      this.options.envMap?.build(this.buildOptions);
     this.polyfill = !this.device.features.has(EnvMap.features[0]);
     const { sampleType, type } = getFilterType(this.polyfill);
     entries.push({

@@ -22,7 +22,6 @@ export class WebGPURenderer {
   static features: GPUFeatureName[] = [];
   public className?: string;
   public parentID?: string;
-  private done: boolean = false;
   constructor(options?: { className?: string; parentID?: string }) {
     this.className = options?.className;
     this.parentID = options?.parentID;
@@ -114,7 +113,6 @@ export class WebGPURenderer {
     }
 
     this.device.queue.submit([encoder.finish()]);
-    this.done = true;
     if (!realtime && envMap) {
       envMap.done();
     }

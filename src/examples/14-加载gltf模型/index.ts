@@ -1,12 +1,10 @@
 import { degToRad } from "../../tools/math";
 import { GLTFLoaderV2, GLTFScene } from "../../tools/loaders/GLTFLoader-v2";
 import { OrbitController, PerspectiveCamera } from "../../tools/camera";
-import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { GUI } from "dat.gui";
 import { Scene } from "../../tools/scene";
 import { DirectionLight, PointLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
-import { CreateAndSetRecord } from "../../tools/loaders";
 import { LoaderBarDomElement } from "./loaderBar";
 import { EnvMapLoader } from "../../tools/utils/envmap";
 

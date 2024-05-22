@@ -25,6 +25,7 @@ import {
   SolidColorTextureCache,
   SolidColorTextureType,
 } from "../../scene/cache";
+import { isEqual } from "lodash-es";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -811,6 +812,18 @@ export class GLTFScene implements Renderable, Buildable {
         });
       });
     });
+
+    /////////////option delete future///////////////////
+    if (!isEqual(Reflect.get(this, "lastRecord"), record))
+      document.querySelector(".record")!.innerHTML = `
+<div>pipelineCount: ${record.pipelineCount}</div>
+<div>pipelineSets: ${record.pipelineSets}</div>
+<div>bindGroupCount: ${record.bindGroupCount}</div>
+<div>bindGroupSets: ${record.bindGroupSets}</div>
+<div>bufferSets: ${record.bufferSets}</div>
+<div>drawCount: ${record.drawCount}</div>
+`;
+    Reflect.set(this, "lastRecord", record);
     return record;
   }
 
