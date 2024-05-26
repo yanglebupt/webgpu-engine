@@ -144,3 +144,15 @@ fn hammersley(n: u32, N: u32) -> vec2f {
   return vec2f(f32(n) / f32(N), radicalInverse(n));
 }
 `;
+
+export const random = /*wgsl*/ `
+// Hash Functions for GPU Rendering, Jarzynski et al.
+// http://www.jcgt.org/published/0009/03/02/
+fn random_pcg3d(_v: vec3u) -> vec3f {
+  var v = _v * 1664525u + 1013904223u;
+  v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+  v.x = v.x ^ (v.x >> 16u); v.y = v.y ^ (v.y >> 16u); v.z = v.z ^ (v.z >> 16u);
+  v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+  return vec3f(v) * (1.0/f32(0xffffffffu));
+}
+`;

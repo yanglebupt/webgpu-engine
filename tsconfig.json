@@ -26,8 +26,6 @@
     "src/examples/04-贴图/**/*.ts",
     "src/examples/05-加载贴图/**/*.ts",
     "src/examples/09-cubemap贴图/**/*.ts",
-    "src/examples/15-IBL-BRDF 重要性采样/**/*.ts",
-    "src/examples/16-IBL-重要性采样/**/*.ts",
     "src/tools/loaders/ObjLoader/index.ts",
     "docs"
   ]

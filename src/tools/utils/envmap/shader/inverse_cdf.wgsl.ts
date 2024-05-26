@@ -1,4 +1,4 @@
-import { textureUV } from "../../tools/shaders/utils";
+import { textureUV } from "../../../../tools/shaders/utils";
 
 export default (format: string, chunkSize: number[]) => /* wgsl */ `
 @group(0) @binding(0) var pdfMap: texture_storage_2d<${format}, read>;

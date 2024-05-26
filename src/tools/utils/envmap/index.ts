@@ -1,6 +1,7 @@
 import {
   ShaderDataDefinitions,
   StructuredView,
+  createTextureFromSource,
   makeShaderDataDefinitions,
   makeStructuredView,
 } from "webgpu-utils";
@@ -24,6 +25,9 @@ import {
   VirtualView,
 } from "../../scene/types";
 import { GPUSamplerCache } from "../../scene/cache";
+import pdf from "./shader/pdf.wgsl.ts";
+import inverse_cdf from "./shader/inverse_cdf.wgsl.ts";
+import IBL_IS from "./shader/ibl-is.wgsl.ts";
 
 export interface EnvMapPartOptions {
   mipLevel?: number;
@@ -33,9 +37,15 @@ export interface EnvMapPartOptions {
 export interface EnvMapOptions {
   mipmaps?: boolean;
   diffuse?: EnvMapPartOptions;
-  // roughness 分多少级，也就是计算多少次不同的 roughness, 然后对其他 roughness 进行插值
-  // 默认是 mipLevelCount 是一样的
-  specular?: EnvMapPartOptions & { roughnessDetail?: number };
+  specular?: EnvMapPartOptions & {
+    // roughness 分多少级，也就是计算多少次不同的 roughness, 然后对其他 roughness 进行插值，默认是 mipLevelCount 是一样的
+    roughnessDetail?: number;
+    fixed?: boolean;
+    minLevel?: number;
+  };
+  pbrSpecular?: {
+    T2: { width?: number; height?: number };
+  };
   samplers?: number;
 
   diffuseColor?: Vec4;
@@ -52,6 +62,11 @@ export interface EnvMap {
   texture: GPUTexture;
   diffuseTexure: GPUTexture;
   specularTexure: GPUTexture;
+  details: number;
+  pbrSpecularTexure: {
+    T1: GPUTexture;
+    T2: GPUTexture;
+  };
   doned: boolean;
   done(): void;
 
@@ -59,6 +74,17 @@ export interface EnvMap {
   bindGroup: GPUBindGroup;
   uniformBuffer: GPUBuffer;
   sampler: GPUSampler;
+
+  // compute
+  buildCompute: boolean;
+  pipeline: GPUComputePipeline;
+  dispatchSize: number[];
+  roughnesses: number[];
+  levels: number[];
+
+  createBindGroup(device: GPUDevice, baseMipLevel: number): GPUBindGroup;
+
+  buildComputePipeline(device: GPUDevice): void;
 }
 
 export function getFilterType(polyfill: boolean) {
@@ -99,6 +125,7 @@ export abstract class EnvMap
       EnvMap.view = makeStructuredView(EnvMap.defs.uniforms[ENV_NAME]);
     } catch (error) {}
   }
+  protected _format: GPUTextureFormat = "rgba32float";
 
   constructor(
     public hdrReturn: HDRLoaderReturn<Float32Array>,
@@ -117,15 +144,15 @@ export abstract class EnvMap
     cached,
   }: BuildOptions) {
     const { color, width, height } = this.hdrReturn;
-    const { mipmaps = true } = this.options ?? {};
-    const _format: GPUTextureFormat = "rgba32float";
+    const { mipmaps } = this.options ?? {};
+
     this.polyfill = !device.features.has("float32-filterable");
 
     this.sampler = createSamplerByPolyfill(this.polyfill, cached.sampler);
 
     // hdr 贴图
     this.texture = device.createTexture({
-      format: _format,
+      format: this._format,
       mipLevelCount: mipmaps ? maxMipLevelCount(width, height) : 1,
       size: [width, height],
       usage:
@@ -142,21 +169,29 @@ export abstract class EnvMap
     );
 
     // IBL IS 后的贴图
-    this.diffuseTexure = createEmptyStorageTexture(device, _format, [
+    this.diffuseTexure = createEmptyStorageTexture(device, this._format, [
       width,
       height,
     ]);
+    this.details = Math.min(
+      maxMipLevelCount(width, height),
+      this.options?.specular?.roughnessDetail ?? 5
+    );
     this.specularTexure = createEmptyStorageTexture(
       device,
-      _format,
+      this._format,
       [width, height],
       {
-        mipLevelCount: Math.min(
-          this.texture.mipLevelCount,
-          this.options?.specular?.roughnessDetail ?? 5
-        ),
+        mipLevelCount: this.details,
       }
     );
+    const wh = this.options?.pbrSpecular?.T2 ?? {};
+    this.pbrSpecularTexure = {
+      T1: createEmptyStorageTexture(device, this._format, [width, height], {
+        mipLevelCount: this.details,
+      }),
+      T2: createEmptyStorageTexture(device, this._format, [width, height]),
+    };
 
     // 渲染管线
     const { sampleType, type } = getFilterType(this.polyfill);
@@ -209,6 +244,9 @@ export abstract class EnvMap
         { binding: 2, resource: this.texture.createView() },
       ],
     });
+
+    this.buildComputePipeline(device);
+    this.buildCompute = true;
   }
 
   getBufferView() {
@@ -219,6 +257,31 @@ export abstract class EnvMap
       specularFactor: this.options?.specularFactor ?? [0.2, 0.2, 0.2],
       specularDetails: this.specularTexure.mipLevelCount,
     };
+  }
+
+  generateRoughness() {
+    this.roughnesses = [];
+    this.levels = [];
+    console.log(`roughness details: ${this.details}`);
+    const { fixed = false, minLevel = this.texture.mipLevelCount / 2 } =
+      this.options?.specular ?? {};
+    for (let i = 0; i < this.details; i++) {
+      const roughness = i / (this.details - 1);
+      let level = roughness * this.texture.mipLevelCount;
+      if (level >= this.texture.mipLevelCount - 1) {
+        level = this.texture.mipLevelCount - 2;
+      } else if (level <= minLevel - 1 && roughness > 0) {
+        level = minLevel;
+      }
+      if (roughness > 0) this.levels.push(fixed ? minLevel : level);
+      else this.levels.push(0);
+      this.roughnesses.push(roughness);
+    }
+  }
+
+  done() {
+    if (this.doned) return;
+    this.doned = true;
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice, camera: Camera) {
@@ -235,17 +298,13 @@ export abstract class EnvMap
 }
 
 export class EnvMapBRDFIS extends EnvMap {
-  public hasGeneratedMips = false;
+  private hasGeneratedMips = false;
+
   constructor(
     hdrReturn: HDRLoaderReturn<Float32Array>,
     options?: EnvMapOptions
   ) {
     super(hdrReturn, options);
-  }
-
-  done() {
-    if (this.doned) return;
-    this.doned = true;
   }
 
   compute(computePass: GPUComputePassEncoder, device: GPUDevice) {
@@ -254,39 +313,79 @@ export class EnvMapBRDFIS extends EnvMap {
       mipmap.generateMipmaps(this.texture);
       this.hasGeneratedMips = true;
     }
-    const mipLevels = [
-      this.options?.diffuse?.mipLevel ?? 6,
-      this.options?.specular?.mipLevel ?? 4,
-    ] as [number, number];
-    const { pipeline, createBindGroup, dispatchSize, roughnesses } =
-      this.build_IBL_BRDF_IS_ComputePass(device, mipLevels);
-    computePass.setPipeline(pipeline);
-    for (let i = 0; i < roughnesses.length; i++) {
-      computePass.setBindGroup(0, createBindGroup(i));
+    if (!this.buildCompute) return;
+    computePass.setPipeline(this.pipeline);
+    for (let i = 0; i < this.roughnesses.length; i++) {
+      computePass.setBindGroup(0, this.createBindGroup(device, i));
       const _ds = getSizeForMipFromTexture(
-        [dispatchSize[1], dispatchSize[2]],
+        [this.dispatchSize[1], this.dispatchSize[2]],
         i
       );
       computePass.dispatchWorkgroups(1, _ds[0], _ds[1]);
     }
   }
 
-  generateRoughness(details: number) {
-    const arr: number[] = [];
-    for (let i = 0; i < details; i++) {
-      arr.push(i / (details - 1));
-    }
-    return arr;
+  createBindGroup(device: GPUDevice, baseMipLevel: number) {
+    const buffer = device.createBuffer({
+      size: 4 * 2,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    });
+    device.queue.writeBuffer(
+      buffer,
+      0,
+      new Float32Array([
+        this.roughnesses[baseMipLevel],
+        this.levels[baseMipLevel],
+      ])
+    );
+    return device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: this.texture.createView(),
+        },
+        {
+          binding: 1,
+          resource: this.diffuseTexure.createView(),
+        },
+        {
+          binding: 2,
+          resource: this.specularTexure.createView({
+            mipLevelCount: 1,
+            baseMipLevel,
+          }),
+        },
+        {
+          binding: 3,
+          resource: this.pbrSpecularTexure.T1.createView({
+            mipLevelCount: 1,
+            baseMipLevel,
+          }),
+        },
+        {
+          binding: 4,
+          resource: this.pbrSpecularTexure.T2.createView(),
+        },
+        {
+          binding: 5,
+          resource: this.sampler,
+        },
+        {
+          binding: 6,
+          resource: { buffer },
+        },
+      ],
+    });
   }
 
-  build_IBL_BRDF_IS_ComputePass(
-    device: GPUDevice,
-    mipLevels: [number, number]
-  ) {
-    const details = this.specularTexure.mipLevelCount;
-    console.log(`roughness details: ${details}`);
+  buildComputePipeline(device: GPUDevice) {
+    const mipLevels = [
+      this.options?.diffuse?.mipLevel ?? 6,
+      this.options?.specular?.mipLevel ?? 4,
+    ] as [number, number];
     const { width, height, format } = this.texture;
-    const roughnesses = this.generateRoughness(details);
+    this.generateRoughness();
     const samplers = this.options?.samplers ?? 512;
     const { chunkSize, dispatchSize, order } =
       DispatchCompute.dispatchImageAndSampler(
@@ -307,7 +406,7 @@ export class EnvMapBRDFIS extends EnvMap {
       this.polyfill ? "use polyfill" : ""
     );
 
-    const pipeline = createComputePipeline(
+    this.pipeline = createComputePipeline(
       IBL_BRDF_IS(
         this.polyfill,
         format,
@@ -345,12 +444,25 @@ export class EnvMapBRDFIS extends EnvMap {
                 {
                   binding: 3,
                   visibility: GPUShaderStage.COMPUTE,
+                  storageTexture: { access: "write-only", format },
+                },
+                {
+                  binding: 4,
+                  visibility: GPUShaderStage.COMPUTE,
+                  storageTexture: {
+                    access: "write-only",
+                    format,
+                  },
+                },
+                {
+                  binding: 5,
+                  visibility: GPUShaderStage.COMPUTE,
                   sampler: {
                     type,
                   },
                 },
                 {
-                  binding: 4,
+                  binding: 6,
                   visibility: GPUShaderStage.COMPUTE,
                   buffer: { type: "uniform" },
                 },
@@ -360,67 +472,206 @@ export class EnvMapBRDFIS extends EnvMap {
         }),
       }
     );
-    const createBindGroup = (baseMipLevel: number) => {
-      const buffer = device.createBuffer({
-        size: 4,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-      });
-      device.queue.writeBuffer(
-        buffer,
-        0,
-        new Float32Array([roughnesses[baseMipLevel]])
-      );
-      return device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          {
-            binding: 0,
-            resource: this.texture.createView(),
-          },
-          {
-            binding: 1,
-            resource: this.diffuseTexure.createView(),
-          },
-          {
-            binding: 2,
-            resource: this.specularTexure.createView({
-              mipLevelCount: 1,
-              baseMipLevel,
-            }),
-          },
-          {
-            binding: 3,
-            resource: this.sampler,
-          },
-          {
-            binding: 4,
-            resource: { buffer },
-          },
-        ],
-      });
-    };
-    return {
-      pipeline,
-      createBindGroup,
-      dispatchSize,
-      roughnesses,
-    };
+
+    this.dispatchSize = dispatchSize;
   }
 }
 
 export class EnvMapIBLIS extends EnvMap {
-  compute(computePass: GPUComputePassEncoder, device?: GPUDevice): void {
-    throw new Error("Method not implemented.");
+  // compute
+  private rowAvgTexture!: GPUTexture;
+  private pdfTexture!: GPUTexture;
+  private inverseCDFTexture!: GPUTexture;
+
+  private preComputed: boolean = false;
+  private pre_compute: Array<{
+    pipeline: GPUComputePipeline;
+    bindGroup: GPUBindGroup;
+    dispatchSize: number[];
+  }> = new Array(2);
+
+  done() {
+    if (this.doned) return;
+    this.rowAvgTexture.destroy();
+    this.pdfTexture.destroy();
+    //@ts-ignore
+    this.rowAvgTexture = null;
+    //@ts-ignore
+    this.pdfTexture = null;
+    this.doned = true;
+  }
+
+  buildComputePipeline(device: GPUDevice) {
+    const { avg_gray, row_avg, width, height } = this.hdrReturn;
+
+    this.generateRoughness();
+
+    this.rowAvgTexture = createTextureFromSource(
+      device,
+      { data: row_avg, width: 1, height },
+      {
+        mips: false,
+        usage:
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.STORAGE_BINDING |
+          GPUTextureUsage.COPY_SRC,
+        format: this._format,
+      }
+    );
+
+    // 根据 device 的最大限制计算分块, chunk 并行计算
+    let { chunkSize, dispatchSize } = DispatchCompute.dispatch(device, [
+      width,
+      height,
+    ]);
+    console.log(`chunk size: ${chunkSize}, dispatch size: ${dispatchSize}`);
+
+    // 计算联合概率、边缘概率、条件概率
+    const pdf_pipeline = createComputePipeline(
+      pdf(this._format, avg_gray, chunkSize),
+      device
+    );
+    /*
+      pdfTexture: 合并 texture 来减少资源开销
+      [r] 代表 joint pdf  [g] 代表 condition pdf [b] 代表 margin pdf，因为是一维的，只有第一列有效
+    */
+    this.pdfTexture = createEmptyStorageTexture(device, this._format, [
+      width,
+      height,
+    ]);
+    const pdf_bindGroup = device.createBindGroup({
+      layout: pdf_pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.texture.createView() },
+        { binding: 1, resource: this.rowAvgTexture.createView() },
+        { binding: 2, resource: this.pdfTexture.createView() },
+      ],
+    });
+
+    // 计算逆 CDF
+    const inverse_cdf_pipeline = createComputePipeline(
+      inverse_cdf(this._format, chunkSize),
+      device
+    );
+    /*
+      inverseCDFTexture: 由于 rgba32float 不支持 read_write，无法覆盖前面的 pdfTexture，因此只能再新建一个
+      [r] 代表 joint pdf  [g] 代表 condition inverse cdf [b] 代表 margin inverse cdf，因为是一维的，只有第一列有效
+    */
+    this.inverseCDFTexture = createEmptyStorageTexture(device, this._format, [
+      width,
+      height,
+    ]);
+    const inverse_cdf_bindGroup = device.createBindGroup({
+      layout: inverse_cdf_pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.pdfTexture.createView() },
+        { binding: 1, resource: this.inverseCDFTexture.createView() },
+      ],
+    });
+
+    // 预计算
+    this.pre_compute = [
+      { pipeline: pdf_pipeline, bindGroup: pdf_bindGroup, dispatchSize },
+      {
+        pipeline: inverse_cdf_pipeline,
+        bindGroup: inverse_cdf_bindGroup,
+        dispatchSize,
+      },
+    ];
+
+    // IBL-IS
+    const samplers = this.options?.samplers ?? 10;
+    const {
+      chunkSize: chunkSize_sample,
+      dispatchSize: dispatch_sample,
+      order,
+    } = DispatchCompute.dispatchImageAndSampler(
+      device,
+      [width, height],
+      samplers
+    );
+    console.log(
+      `sample chunk size: ${chunkSize_sample}, sample dispatch size: ${dispatch_sample}`
+    );
+    this.pipeline = createComputePipeline(
+      IBL_IS(
+        this._format,
+        chunkSize_sample,
+        dispatch_sample[order[2]],
+        order,
+        this.options?.diffuse?.INT ?? 1e4,
+        this.options?.specular?.INT ?? 1e4
+      ),
+      device
+    );
+    this.dispatchSize = dispatch_sample;
+  }
+
+  createBindGroup(device: GPUDevice, baseMipLevel: number) {
+    const buffer = device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    });
+    device.queue.writeBuffer(
+      buffer,
+      0,
+      new Float32Array([this.roughnesses[baseMipLevel]])
+    );
+    return device.createBindGroup({
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.texture.createView() },
+        { binding: 1, resource: this.inverseCDFTexture.createView() },
+        { binding: 2, resource: this.diffuseTexure.createView() },
+        {
+          binding: 3,
+          resource: this.specularTexure.createView({
+            baseMipLevel,
+            mipLevelCount: 1,
+          }),
+        },
+        {
+          binding: 4,
+          resource: { buffer },
+        },
+      ],
+    });
+  }
+
+  compute(computePass: GPUComputePassEncoder, device: GPUDevice): void {
+    if (!this.buildCompute) return;
+    if (!this.preComputed) {
+      // 只需要计算一次
+      this.pre_compute.forEach(({ pipeline, bindGroup, dispatchSize }) => {
+        computePass.setPipeline(pipeline);
+        computePass.setBindGroup(0, bindGroup);
+        computePass.dispatchWorkgroups(dispatchSize[0], dispatchSize[1]);
+      });
+      this.preComputed = true;
+    }
+    computePass.setPipeline(this.pipeline);
+    for (let i = 0; i < this.roughnesses.length; i++) {
+      computePass.setBindGroup(0, this.createBindGroup(device, i));
+      const _ds = getSizeForMipFromTexture(
+        [this.dispatchSize[1], this.dispatchSize[2]],
+        i
+      );
+      computePass.dispatchWorkgroups(1, _ds[0], _ds[1]);
+    }
   }
 }
 
 export class EnvMapLoader {
   async load(filename: string, options?: EnvMapOptions) {
     const hdrLoader = new HDRLoader();
+    const ibl_is = !!!options?.mipmaps;
     const result = await hdrLoader.load<Float32Array>(filename, {
       sRGB: false,
       uint8: false,
+      returnRowAvgGray: ibl_is,
     });
-    return new EnvMapBRDFIS(result, options);
+    return ibl_is
+      ? new EnvMapIBLIS(result, options)
+      : new EnvMapBRDFIS(result, options);
   }
 }

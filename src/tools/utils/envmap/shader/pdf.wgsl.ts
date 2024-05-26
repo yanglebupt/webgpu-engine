@@ -1,4 +1,4 @@
-import { rgb2gray } from "../../tools/shaders/utils";
+import { rgb2gray } from "../../../../tools/shaders/utils";
 
 export default (
   format: string,

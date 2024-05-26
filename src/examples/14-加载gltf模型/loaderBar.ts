@@ -44,8 +44,9 @@ export class LoaderBarDomElement {
   }
 
   setPercentage(percentage: number, name?: string, url?: string) {
-    this.bar.style.setProperty("width", `${percentage * 100}%`);
-    this.text.textContent = `${name}: ${percentage * 100}%`;
+    const p = (percentage * 100).toFixed(2);
+    this.bar.style.setProperty("width", `${p}%`);
+    this.text.textContent = `${name}: ${p}%`;
   }
 
   showLoading() {
@@ -57,6 +58,7 @@ export class LoaderBarDomElement {
     this.nextTick(() => {
       this.root.classList.toggle("show");
       this.bar.style.setProperty("width", `0`);
+      this.text.textContent = "";
     });
   }
 
