@@ -96,7 +96,7 @@ async function frame() {
 
 ## 加载效果截图
 
-项目地址：https://yanglebupt.github.io/webgpu-learn/ 由于默认加载线上模型，请求模型并下载需要一定时间，一旦请求完成，模型放入浏览器缓存后，渲染很快的
+项目地址：https://yanglebupt.github.io/webgpu-engine/ 由于默认加载线上模型，请求模型并下载需要一定时间，一旦请求完成，模型放入浏览器缓存后，渲染很快的
 
 ![](./public/assets/gltf-loader.png)
 ![](./public/assets/IBL-IS.png)
