@@ -48,8 +48,8 @@ export class Scene implements Renderable {
       depthFormat: this.renderer.depthFormat,
       scene: this,
       cached: {
-        sampler: new GPUSamplerCache(this.device),
-        solidColorTexture: new SolidColorTextureCache(this.device),
+        sampler: GPUSamplerCache.neww(this.device),
+        solidColorTexture: SolidColorTextureCache.neww(this.device),
       },
     };
 

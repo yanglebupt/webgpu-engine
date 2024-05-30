@@ -12,8 +12,8 @@
 // export * from "./examples/01.5-计算shader/example";
 // import { frame } from "./examples/11-计算 shader 的高级用法";
 // import { frame } from "./examples/12-skybox 的原理";
-// import { frame } from "./examples/14-加载gltf模型";
-import { frame } from "./examples/15-IBL-BRDF 重要性采样";
+import { frame } from "./examples/14-加载gltf模型";
+// import { frame } from "./examples/15-IBL-BRDF 重要性采样";
 // import { frame } from "./examples/16-IBL-重要性采样";
 // import { frame } from "./examples/17-自己的mipmap类";
 

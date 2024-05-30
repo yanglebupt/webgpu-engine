@@ -21,11 +21,12 @@ import {
   Renderable,
 } from "../../scene/types";
 import {
-  GPUSamplerCache,
-  SolidColorTextureCache,
+  GPUSamplerCacheType,
+  SolidColorTextureCacheType,
   SolidColorTextureType,
 } from "../../scene/cache";
 import { isEqual } from "lodash-es";
+import { MipMap, maxMipLevelCount } from "../../utils/mipmaps";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -568,7 +569,11 @@ export class GLTFScene implements Renderable, Buildable {
       (view) =>
         view.flag === GLTFBufferViewFlag.BUFFER && view.uploadBuffer(device)
     );
-    images.map((image) => image.view.uploadTexture(device, this._mips));
+    const mipmap = this._mips ? new MipMap(device) : { device };
+    const len = images.length - 1;
+    images.map((image, idx) =>
+      image.view.uploadTexture(mipmap, this._mips, idx == len)
+    );
   }
 
   // 创建 render-order
@@ -831,8 +836,10 @@ export class GLTFScene implements Renderable, Buildable {
   set mips(mips: boolean) {
     if (mips == this._mips) return;
     this._mips = mips;
-    this.resources.images.map((image) =>
-      image.view.uploadTexture(this.device, this._mips)
+    const mipmap = mips ? new MipMap(this.device) : { device: this.device };
+    const len = this.resources.images.length - 1;
+    this.resources.images.map(
+      (image, idx) => image.view.uploadTexture(mipmap, mips, idx == len) // 如何不重新生成 texture 下切换是否使用 mipmap
     );
     this.renderPipelines.forEach((renderPipeline) => {
       const materialPrimitivesMap = new Map<RenderNode, RenderPrimitive[]>();
@@ -1243,11 +1250,33 @@ export class GLTFBufferView {
     this.bitmap = await createImageBitmap(blob);
   }
 
-  async uploadTexture(device: GPUDevice, mips?: boolean) {
+  uploadTexture(
+    mipmap: MipMap | { device: GPUDevice },
+    mips?: boolean,
+    closed = false
+  ) {
     if (!this.format) throw new Error("Can't upload texture without format");
     if (!this.bitmap)
       throw new Error("Can't upload texture without create bitmap");
-    this.texture = createTextureFromSource(device, this.bitmap, { mips: mips });
+    const size = [this.bitmap.width, this.bitmap.height];
+    this.texture = createTextureFromSource(mipmap.device, this.bitmap, {
+      mips: false,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC,
+      mipLevelCount: mips ? maxMipLevelCount(...size) : 1,
+    });
+    if (mips && mipmap instanceof MipMap) {
+      mipmap.generateMipmaps(this.texture, { closed });
+      // @ts-ignore
+      if (closed) mipmap = null;
+    }
+  }
+
+  set mips(mips: boolean) {
+    this.texture?.createView({});
   }
 
   // 最小的 bufferView，不再进行切分了
@@ -1327,13 +1356,13 @@ export class GLTFSampler {
     Object.assign(this, sampler);
   }
 
-  static createDefaultSampler(cached: GPUSamplerCache) {
+  static createDefaultSampler(cached: GPUSamplerCacheType) {
     if (!GLTFSampler.defaultSampler) {
       GLTFSampler.defaultSampler = cached.default;
     }
   }
 
-  uploadSampler(cached: GPUSamplerCache) {
+  uploadSampler(cached: GPUSamplerCacheType) {
     const descriptor: GPUSamplerDescriptor = {
       addressModeU: this.addressModeForWrap(this.wrapS),
       addressModeV: this.addressModeForWrap(this.wrapT),
@@ -1398,7 +1427,7 @@ export class GLTFMaterial {
     Object.assign(this, __json);
   }
 
-  uploadSolidColorTexture(cached: SolidColorTextureCache) {
+  uploadSolidColorTexture(cached: SolidColorTextureCacheType) {
     // 值
     const preferredFormat = StaticTextureUtil.renderFormat.split("-")[0];
     // 贴图和采样器

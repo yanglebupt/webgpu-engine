@@ -35,27 +35,32 @@ export class MipMap {
      注意点：MipMap 是一级接着一级生成的，没法一次到位，（至少目前不太清楚高效的一步到位生成某一个 level 的 mipmap）
      因此后面提取 mipmap filter 依赖于这一步
   */
-  generateMipmaps(texture: GPUTexture, config?: SPDPassConfig) {
+  generateMipmaps(
+    texture: GPUTexture,
+    config?: SPDPassConfig & { closed?: boolean }
+  ) {
     const pass = this.downsampler.preparePass(this.device, texture, config);
     if (!pass) {
       return false;
     } else {
       pass?.encode(this.computePass);
-      this.tryEnd();
+      this.tryEnd(config?.closed);
       return true;
     }
   }
 
-  tryEnd() {
-    if (this.needEndPass) {
+  tryEnd(closed: boolean = true) {
+    if (this.needEndPass && closed) {
       this.computePass.end();
       this.device.queue.submit([this.commandEncoder!.finish()]);
+      console.log("closed mipmap pass");
     }
   }
 
   extractMipmap(
     texture: GPUTexture,
-    target: { texture: GPUTexture; mipLevels: number[] }
+    target: { texture: GPUTexture; mipLevels: number[] },
+    closed = true
   ) {
     const size = [texture.width, texture.height] as [number, number];
     const format = texture.format;
@@ -100,7 +105,7 @@ export class MipMap {
       dispatchSize[1],
       dispatchSize[2]
     );
-    this.tryEnd();
+    this.tryEnd(closed);
   }
 }
 

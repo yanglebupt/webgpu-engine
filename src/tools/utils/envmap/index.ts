@@ -24,7 +24,7 @@ import {
   Renderable,
   VirtualView,
 } from "../../scene/types";
-import { GPUSamplerCache } from "../../scene/cache";
+import { GPUSamplerCacheType } from "../../scene/cache";
 import pdf from "./shader/pdf.wgsl.ts";
 import inverse_cdf from "./shader/inverse_cdf.wgsl.ts";
 import IBL_IS from "./shader/ibl-is.wgsl.ts";
@@ -98,7 +98,7 @@ export function getFilterType(polyfill: boolean) {
 
 export function createSamplerByPolyfill(
   polyfill: boolean,
-  cached: GPUSamplerCache
+  cached: GPUSamplerCacheType
 ) {
   return polyfill ? cached.get({}) : cached.default;
 }

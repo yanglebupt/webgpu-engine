@@ -39,7 +39,7 @@ fn texture(map: texture_storage_2d<${format}, read>, uv: vec2f, size: vec2u) -> 
 }
 
 fn roughness2shininess(roughness: f32) -> f32 {
-  return pow(1000.0, 1.-roughness);
+  return pow(100.0, 1.-roughness);
 }
 
 fn add_radiance(diffuse_dispatch_rad: vec3f, specular_dispatch_rad: vec3f){
@@ -85,6 +85,7 @@ fn main(
   var specular_dispatch_rad = vec3f(0.0);
 
   let shininess = roughness2shininess(roughness);
+  let isFirst = roughness<=0.0;
   
   // dispatch_sample 很小，不如直接串行，否则还需要合并有些麻烦
   for(var j=0u; j<${dispatch_sample}; j++){
@@ -94,20 +95,12 @@ fn main(
     let sampleX = texture(inverseCDFMap, vec2f(random.x, sampleY), size).g;
     let uv = vec2f(sampleX, sampleY);
     let pos = SphereTexCoord2Dir(uv);
-    let cosTheta = dot(pos, normal);
+    let cosTheta = max(dot(pos, normal), 0.0);
     let pdf = max(texture(inverseCDFMap, uv, size).r, 1e-4);
     let theta = PI*(1.0-uv.y);
     let l = texture(envMap, uv, size).rgb;
-    diffuse_dispatch_rad += select(
-      vec3f(0.0),
-      2.0*PI*l*cosTheta*sin(theta)/pdf,
-      cosTheta>0.0
-    );
-    specular_dispatch_rad += select(
-      vec3f(0.0),
-      PI*l*pow(cosTheta, shininess)*sin(theta)/pdf,
-      cosTheta>0.0
-    );
+    diffuse_dispatch_rad += 2.0*PI*l*cosTheta*sin(theta)/pdf;
+    specular_dispatch_rad += PI*l*pow(cosTheta, shininess)*sin(theta)/pdf;
   }
 
   add_radiance(diffuse_dispatch_rad, specular_dispatch_rad);
@@ -121,7 +114,7 @@ fn main(
   var fin_specular_radiance = fin_radiance[1];
   fin_specular_radiance /= (f32(N)/(2.0+shininess));
 
-  if(roughness<=0.0){
+  if(isFirst){
     textureStore(diffuseMap, pixel, vec4f(fin_diffuse_radiance,1.0));
   }
   textureStore(specularMap, pixel, vec4f(fin_specular_radiance,1.0));
