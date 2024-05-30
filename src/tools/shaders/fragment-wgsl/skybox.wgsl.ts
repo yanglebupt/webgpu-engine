@@ -1,7 +1,8 @@
 import { wgsl } from "wgsl-preprocessor";
 import { textureFilter } from "../utils";
+import { ShaderContext } from "..";
 
-export default (polyfill: boolean) => wgsl/*wgsl*/ `
+export default (context: ShaderContext) => wgsl/*wgsl*/ `
 
 const PI = 3.141592653589793;
 
@@ -26,7 +27,7 @@ fn Dir2SphereTexCoord(dir: vec3f) -> vec2f {
   return vec2f(s, t);
 }
 
-${textureFilter(polyfill, "ourSampler")}
+${textureFilter(context.polyfill, "ourSampler")}
 
 @fragment
 fn main(@location(1) pos: vec4f) -> @location(0) vec4f {

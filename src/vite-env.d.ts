@@ -6,3 +6,7 @@ declare module "wgsl-preprocessor" {
     ...values: any[]
   ): string;
 }
+
+interface GPUBindGroupLayout {
+  id: string;
+}

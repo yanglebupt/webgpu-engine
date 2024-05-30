@@ -7,7 +7,7 @@ import {
   createSamplerByPolyfill,
   getFilterType,
 } from "../utils/envmap";
-import { GPUSamplerCache, SolidColorTextureCache } from "./cache";
+
 import {
   BuildOptions,
   Buildable,
@@ -47,11 +47,8 @@ export class Scene implements Renderable {
       device: this.device,
       format: this.renderer.format,
       depthFormat: this.renderer.depthFormat,
+      cached: this.renderer.cached!,
       scene: this,
-      cached: {
-        sampler: new GPUSamplerCache(this.device),
-        solidColorTexture: new SolidColorTextureCache(this.device),
-      },
     };
     Logger.log(this.buildOptions.cached);
     const entries: GPUBindGroupLayoutEntry[] = [
@@ -107,9 +104,8 @@ export class Scene implements Renderable {
       this.buildOptions.cached.sampler
     );
 
-    this.bindGroupLayout = this.device.createBindGroupLayout({
-      entries,
-    });
+    this.bindGroupLayout =
+      this.buildOptions.cached.bindGroupLayout.get(entries);
 
     this.buffers[0] = this.device.createBuffer({
       size: Camera.view.arrayBuffer.byteLength,

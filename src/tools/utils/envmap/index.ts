@@ -195,42 +195,37 @@ export abstract class EnvMap
 
     // 渲染管线
     const { sampleType, type } = getFilterType(this.polyfill);
-    this.renderPipeline = createRenderPipeline(
-      vertex(),
-      fragment(this.polyfill),
-      device,
-      format,
-      [null],
+    this.renderPipeline = cached.pipeline.get(
+      { code: vertex, context: {} },
+      { code: fragment, context: { polyfill: this.polyfill } },
       {
-        layout: device.createPipelineLayout({
-          bindGroupLayouts: [
-            device.createBindGroupLayout({
-              entries: [
-                {
-                  binding: 0,
-                  visibility: GPUShaderStage.FRAGMENT,
-                  buffer: { type: "uniform" },
-                },
-                {
-                  binding: 1,
-                  visibility: GPUShaderStage.FRAGMENT,
-                  sampler: { type },
-                },
-                {
-                  binding: 2,
-                  visibility: GPUShaderStage.FRAGMENT,
-                  texture: { sampleType },
-                },
-              ],
-            }),
-          ],
-        }),
+        format,
+        primitive: { topology: "triangle-list" },
         depthStencil: {
           format: depthFormat,
           depthWriteEnabled: true,
           depthCompare: "less-equal",
         },
-      }
+      },
+      [
+        cached.bindGroupLayout.get([
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: { type: "uniform" },
+          },
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: { type },
+          },
+          {
+            binding: 2,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType },
+          },
+        ]),
+      ]
     );
     this.uniformBuffer = device.createBuffer({
       size: 4 * 4 * 4,

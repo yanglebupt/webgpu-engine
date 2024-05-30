@@ -323,8 +323,8 @@ export class StorageTextureToCanvas {
         bindGroupLayouts: [bindGroupLayout],
       });
 
-      const vertexStr = vertex(flipY);
-      const fragmentStr = fragment(0);
+      const vertexStr = vertex({ flipY });
+      const fragmentStr = fragment({ mipmapLevel: 0 });
       const renderPipeline = this.getFromCache(
         this.renderPipelineCache,
         {
@@ -359,6 +359,7 @@ export class StorageTextureToCanvas {
 export class Logger {
   static production: boolean = false;
   static log(...msg: any[]) {
-    if (!Logger.production) console.log(...msg);
+    if (Logger.production) return;
+    console.log(...msg);
   }
 }

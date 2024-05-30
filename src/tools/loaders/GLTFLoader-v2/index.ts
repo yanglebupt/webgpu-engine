@@ -21,6 +21,7 @@ import {
   Renderable,
 } from "../../scene/types";
 import {
+  BlendMode,
   GPUSamplerCache,
   SolidColorTextureCache,
   SolidColorTextureType,
@@ -315,7 +316,7 @@ export interface GLTFMaterial {
   emissiveTexture?: { index: number };
   emissiveFactor: number[];
   alphaCutoff?: number;
-  alphaMode: "OPAQUE" | "MASK" | "BLEND";
+  alphaMode: BlendMode;
   doubleSided: boolean;
 }
 
@@ -582,36 +583,30 @@ export class GLTFScene implements Renderable, Buildable {
     this.device = device;
     this.upload(device, cached);
     // new group  假设所有的 node 都使用同一个 bindGroupLayout
-    this.nodeBindGroupLayout = device.createBindGroupLayout({
-      label: "nodeBindGroupLayout",
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-      ],
-    });
-    this.materialBindGroupLayout = device.createBindGroupLayout({
-      label: "materialBindGroupLayout",
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: "uniform" },
-        },
-        ...([1, 2, 3, 4, 5].map((binding) => ({
-          binding,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { viewDimension: "2d" },
-        })) as GPUBindGroupLayoutEntry[]),
-        {
-          binding: 6,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: {},
-        },
-      ],
-    });
+    this.nodeBindGroupLayout = cached.bindGroupLayout.get([
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+    ]);
+    this.materialBindGroupLayout = cached.bindGroupLayout.get([
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: { type: "uniform" },
+      },
+      ...([1, 2, 3, 4, 5].map((binding) => ({
+        binding,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { viewDimension: "2d" },
+      })) as GPUBindGroupLayoutEntry[]),
+      {
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: {},
+      },
+    ]);
 
     const bindGroupLayouts = [scene.bindGroupLayout];
     const polyfill = scene.polyfill;
@@ -680,28 +675,40 @@ export class GLTFScene implements Renderable, Buildable {
           materialCache.set(materialKey, material);
         }
         // 多个 primitive 可以重复用同一个 pipeline，但 buffers 不同，因此我们需要记录
-        let renderPipeline = this.renderPipelines.get(pipelineCacheKey);
+        const ks = JSON.stringify(pipelineCacheKey);
+        let renderPipeline = this.renderPipelines.get(ks);
         if (!renderPipeline) {
-          const { pipeline, create } = getPipelineFromCache(
-            JSON.parse(pipelineCacheKey),
-            device,
-            vertex,
-            fragment,
+          const pipeline = cached.pipeline.get(
+            { code: vertex, context: pipelineCacheKey.shaderContext.vertex },
+            {
+              code: fragment,
+              context: pipelineCacheKey.shaderContext.fragment,
+            },
+            {
+              format,
+              primitive: pipelineCacheKey.primitive,
+              alphaMode: pipelineCacheKey.alphaMode,
+              doubleSided: pipelineCacheKey.doubleSided,
+              bufferLayout: pipelineCacheKey.bufferLayout,
+              depthStencil: {
+                format: depthFormat,
+                depthWriteEnabled: true,
+                depthCompare: "less",
+              },
+              record: this.record,
+            },
             [
               ...bindGroupLayouts,
               this.nodeBindGroupLayout,
               this.materialBindGroupLayout,
-            ],
-            format,
-            depthFormat
+            ]
           );
           renderPipeline = {
             pipeline,
             // 多个 primitive 可以共用同一个 material，因此需要记录使用 material 的 primitive  1 对 多
             materialPrimitivesMap: new Map<RenderNode, RenderPrimitive[]>(),
           };
-          if (create && this.record) this.record.pipelineCount++;
-          this.renderPipelines.set(pipelineCacheKey, renderPipeline);
+          this.renderPipelines.set(ks, renderPipeline);
         }
         let primitives = renderPipeline.materialPrimitivesMap.get(material);
         if (!primitives) {
@@ -919,79 +926,6 @@ export class GLTFMesh {
   }
 }
 
-export const PipelineCache: Map<string, GPURenderPipeline> = new Map();
-export const ShaderModuleCache: Map<string, GPUShaderModule> = new Map();
-export function getShaderModuleFromCache(
-  device: GPUDevice,
-  args: Record<string, any>,
-  code: ShaderModuleCode
-) {
-  const key = JSON.stringify(args);
-  let module = ShaderModuleCache.get(key);
-  if (!module) {
-    module = device.createShaderModule({
-      code: typeof code === "string" ? code : code(args),
-    });
-    ShaderModuleCache.set(key, module);
-  }
-  return module;
-}
-// 从缓存中获取 pipeline
-export function getPipelineFromCache(
-  args: Record<string, any>,
-  device: GPUDevice,
-  vertex: ShaderModuleCode,
-  fragment: ShaderModuleCode,
-  bindGroupLayouts: GPUBindGroupLayout[],
-  format: GPUTextureFormat,
-  depthFormat: GPUTextureFormat
-) {
-  const key = JSON.stringify(args);
-  let pipeline = PipelineCache.get(key);
-  if (pipeline) return { pipeline, create: false };
-  let blend;
-  switch (args.alphaMode) {
-    case "BLEND":
-      blend = {
-        color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
-        alpha: { srcFactor: "one", dstFactor: "one" },
-      } as GPUBlendState;
-      break;
-  }
-  pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({ bindGroupLayouts }),
-    vertex: {
-      module: getShaderModuleFromCache(
-        device,
-        args.shaderContext.vertex,
-        vertex
-      ),
-      entryPoint: "main",
-      buffers: args.bufferLayout,
-    },
-    fragment: {
-      module: getShaderModuleFromCache(
-        device,
-        args.shaderContext.fragment,
-        fragment
-      ),
-      entryPoint: "main",
-      targets: [{ format, blend }],
-    },
-    primitive: {
-      cullMode: args.doubleSided ? "none" : "back",
-      ...args.primitive,
-    },
-    depthStencil: {
-      format: depthFormat,
-      depthWriteEnabled: true,
-      depthCompare: "less",
-    },
-  });
-  PipelineCache.set(key, pipeline);
-  return { pipeline, create: true };
-}
-
 export interface GPUBufferAccessor {
   accessor: GLTFAccessor;
   offset: number;
@@ -1029,7 +963,7 @@ export class GLTFPrimitive {
     const bufferLayout = this.bufferLayout;
     const alphaMode = this.a_material?.alphaMode ?? "OPAQUE";
     return {
-      pipelineCacheKey: JSON.stringify({
+      pipelineCacheKey: {
         primitive,
         bufferLayout,
         alphaMode,
@@ -1043,7 +977,7 @@ export class GLTFPrimitive {
             polyfill,
           },
         },
-      }),
+      },
       vertexCount: this.vertexCount,
       gpuBuffers: this.gpuBuffers,
       indices: this.a_indices,

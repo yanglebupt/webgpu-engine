@@ -5,11 +5,9 @@ export enum ShaderLocation {
   TANGENT = 3,
 }
 
-export type ShaderModuleCode =
-  | string
-  | ((context: Record<string, any>) => string);
+export type ShaderModuleCode = (context: Record<string, any>) => string;
 
-export type ShaderContext = Record<string, any>;
+export type ShaderContext<T = Record<string, any>> = T;
 
 export const VP_NAME = "tf";
 export const M_INSTANCE_NAME = "mtfInstances";

@@ -1,9 +1,16 @@
 import { checkWebGPUSupported, createCanvas } from "..";
 import { StorageTextureToCanvas } from "../helper";
 import { Scene } from "../scene";
+import { BuildCache } from "../scene/types";
 import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 import { EnvMap } from "../utils/envmap";
 import { getSizeForMipFromTexture } from "../utils/mipmaps";
+import {
+  GPUBindGroupLayoutCache,
+  GPURenderPipelineCache,
+  GPUSamplerCache,
+  SolidColorTextureCache,
+} from "../scene/cache";
 
 export interface WebGPURenderer {
   gpu: GPU;
@@ -22,6 +29,7 @@ export class WebGPURenderer {
   static features: GPUFeatureName[] = [];
   public className?: string;
   public parentID?: string;
+  public cached?: BuildCache;
   constructor(options?: { className?: string; parentID?: string }) {
     this.className = options?.className;
     this.parentID = options?.parentID;
@@ -50,11 +58,17 @@ export class WebGPURenderer {
       this.className,
       this.parentID
     );
-    Object.assign(this, {
-      ...gpuSupport,
-      ...canvasReturn,
-      depthFormat: StaticTextureUtil.depthFormat,
-    });
+    (this.cached = {
+      sampler: new GPUSamplerCache(device),
+      solidColorTexture: new SolidColorTextureCache(device),
+      pipeline: new GPURenderPipelineCache(device),
+      bindGroupLayout: new GPUBindGroupLayoutCache(device),
+    }),
+      Object.assign(this, {
+        ...gpuSupport,
+        ...canvasReturn,
+        depthFormat: StaticTextureUtil.depthFormat,
+      });
     return this;
   }
 

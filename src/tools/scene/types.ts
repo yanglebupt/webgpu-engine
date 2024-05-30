@@ -1,5 +1,10 @@
 import { Scene } from ".";
-import { GPUSamplerCache, SolidColorTextureCache } from "./cache";
+import {
+  GPUBindGroupLayoutCache,
+  GPURenderPipelineCache,
+  GPUSamplerCache,
+  SolidColorTextureCache,
+} from "./cache";
 
 export class Type {
   static getClassName(obj: Object) {
@@ -44,7 +49,8 @@ export interface VirtualView {
 export interface BuildCache {
   sampler: GPUSamplerCache;
   solidColorTexture: SolidColorTextureCache;
-  pipeline?: GPURenderPipeline;
+  bindGroupLayout: GPUBindGroupLayoutCache;
+  pipeline: GPURenderPipelineCache;
 }
 export interface BuildOptions {
   device: GPUDevice;
