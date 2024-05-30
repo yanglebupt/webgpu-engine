@@ -1,4 +1,5 @@
 import { Camera, OrbitController } from "../camera";
+import { Logger } from "../helper";
 import { Light } from "../lights";
 import { WebGPURenderer } from "../renderer";
 import {
@@ -48,11 +49,11 @@ export class Scene implements Renderable {
       depthFormat: this.renderer.depthFormat,
       scene: this,
       cached: {
-        sampler: GPUSamplerCache.neww(this.device),
-        solidColorTexture: SolidColorTextureCache.neww(this.device),
+        sampler: new GPUSamplerCache(this.device),
+        solidColorTexture: new SolidColorTextureCache(this.device),
       },
     };
-
+    Logger.log(this.buildOptions.cached);
     const entries: GPUBindGroupLayoutEntry[] = [
       {
         binding: 0,

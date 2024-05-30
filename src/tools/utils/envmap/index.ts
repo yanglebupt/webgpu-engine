@@ -6,7 +6,7 @@ import {
   makeStructuredView,
 } from "webgpu-utils";
 import { createComputePipeline, createRenderPipeline } from "../..";
-import { createEmptyStorageTexture } from "../../helper";
+import { Logger, createEmptyStorageTexture } from "../../helper";
 import { HDRLoader, HDRLoaderReturn } from "../../loaders/HDRLoader";
 import { DispatchCompute } from "../Dispatch";
 import { MipMap, getSizeForMipFromTexture, maxMipLevelCount } from "../mipmaps";
@@ -24,7 +24,7 @@ import {
   Renderable,
   VirtualView,
 } from "../../scene/types";
-import { GPUSamplerCacheType } from "../../scene/cache";
+import { GPUSamplerCache } from "../../scene/cache";
 import pdf from "./shader/pdf.wgsl.ts";
 import inverse_cdf from "./shader/inverse_cdf.wgsl.ts";
 import IBL_IS from "./shader/ibl-is.wgsl.ts";
@@ -98,7 +98,7 @@ export function getFilterType(polyfill: boolean) {
 
 export function createSamplerByPolyfill(
   polyfill: boolean,
-  cached: GPUSamplerCacheType
+  cached: GPUSamplerCache
 ) {
   return polyfill ? cached.get({}) : cached.default;
 }
@@ -262,7 +262,7 @@ export abstract class EnvMap
   generateRoughness() {
     this.roughnesses = [];
     this.levels = [];
-    console.log(`roughness details: ${this.details}`);
+    Logger.log(`roughness details: ${this.details}`);
     const { fixed = false, minLevel = this.texture.mipLevelCount / 2 } =
       this.options?.specular ?? {};
     for (let i = 0; i < this.details; i++) {
@@ -393,13 +393,13 @@ export class EnvMapBRDFIS extends EnvMap {
         [width, height],
         samplers
       );
-    console.log(
+    Logger.log(
       `sample chunk size: ${chunkSize}, sample dispatch size: ${dispatchSize}, order: ${order}`
     );
 
     const { sampleType, type } = getFilterType(this.polyfill);
 
-    console.log(
+    Logger.log(
       `float32-filterable ${this.polyfill ? "not" : ""} supported`,
       sampleType,
       type,
@@ -524,7 +524,7 @@ export class EnvMapIBLIS extends EnvMap {
       width,
       height,
     ]);
-    console.log(`chunk size: ${chunkSize}, dispatch size: ${dispatchSize}`);
+    Logger.log(`chunk size: ${chunkSize}, dispatch size: ${dispatchSize}`);
 
     // 计算联合概率、边缘概率、条件概率
     const pdf_pipeline = createComputePipeline(
@@ -590,7 +590,7 @@ export class EnvMapIBLIS extends EnvMap {
       [width, height],
       samplers
     );
-    console.log(
+    Logger.log(
       `sample chunk size: ${chunkSize_sample}, sample dispatch size: ${dispatch_sample}`
     );
     this.pipeline = createComputePipeline(

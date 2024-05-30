@@ -1,5 +1,5 @@
 import { Scene } from ".";
-import { GPUSamplerCacheType, SolidColorTextureCacheType } from "./cache";
+import { GPUSamplerCache, SolidColorTextureCache } from "./cache";
 
 export class Type {
   static getClassName(obj: Object) {
@@ -42,8 +42,8 @@ export interface VirtualView {
   examples: EnvMap, GLTFScene
 */
 export interface BuildCache {
-  sampler: GPUSamplerCacheType;
-  solidColorTexture: SolidColorTextureCacheType;
+  sampler: GPUSamplerCache;
+  solidColorTexture: SolidColorTextureCache;
   pipeline?: GPURenderPipeline;
 }
 export interface BuildOptions {

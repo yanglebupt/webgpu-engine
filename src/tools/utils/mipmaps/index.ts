@@ -2,6 +2,7 @@ import { SPDPassConfig, WebGPUSinglePassDownsampler } from "webgpu-spd";
 import { createComputePipeline } from "../..";
 import { DispatchCompute } from "../Dispatch";
 import extract_mimmap from "./shaders/extract-mipmap.wgsl";
+import { Logger } from "../../helper";
 
 export function getSizeForMipFromTexture(
   size: [number, number] | number[],
@@ -53,7 +54,7 @@ export class MipMap {
     if (this.needEndPass && closed) {
       this.computePass.end();
       this.device.queue.submit([this.commandEncoder!.finish()]);
-      console.log("closed mipmap pass");
+      Logger.log("closed mipmap pass");
     }
   }
 

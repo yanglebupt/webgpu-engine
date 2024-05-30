@@ -21,12 +21,13 @@ import {
   Renderable,
 } from "../../scene/types";
 import {
-  GPUSamplerCacheType,
-  SolidColorTextureCacheType,
+  GPUSamplerCache,
+  SolidColorTextureCache,
   SolidColorTextureType,
 } from "../../scene/cache";
 import { isEqual } from "lodash-es";
 import { MipMap, maxMipLevelCount } from "../../utils/mipmaps";
+import { Logger } from "../../helper";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -357,7 +358,7 @@ export class GLTFLoaderV2 {
       )
     ) as GLTFJSON;
 
-    console.log(json);
+    Logger.log(json);
 
     // 解析 Binary Chunk Header
     const binaryHeader = new Uint32Array(
@@ -1129,7 +1130,7 @@ export class GLTFPrimitive {
   }
 
   reuploadTexture(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout) {
-    console.log("reupload texture");
+    Logger.log("reupload texture");
     if (!this.a_material) return;
     const textures = this.a_material.textures;
     const sampler = this.a_material.samplers.find((s) => !!s);
@@ -1156,7 +1157,7 @@ export class GLTFPrimitive {
   }
 
   rewriteUniformBuffer(device: GPUDevice) {
-    console.log("rewrite uniform buffer");
+    Logger.log("rewrite uniform buffer");
     if (!this.a_material) return;
     const uniformValue = makeStructuredView(this.defs.uniforms[M_U_NAME]);
     // 传递值
@@ -1356,13 +1357,13 @@ export class GLTFSampler {
     Object.assign(this, sampler);
   }
 
-  static createDefaultSampler(cached: GPUSamplerCacheType) {
+  static createDefaultSampler(cached: GPUSamplerCache) {
     if (!GLTFSampler.defaultSampler) {
       GLTFSampler.defaultSampler = cached.default;
     }
   }
 
-  uploadSampler(cached: GPUSamplerCacheType) {
+  uploadSampler(cached: GPUSamplerCache) {
     const descriptor: GPUSamplerDescriptor = {
       addressModeU: this.addressModeForWrap(this.wrapS),
       addressModeV: this.addressModeForWrap(this.wrapT),
@@ -1427,7 +1428,7 @@ export class GLTFMaterial {
     Object.assign(this, __json);
   }
 
-  uploadSolidColorTexture(cached: SolidColorTextureCacheType) {
+  uploadSolidColorTexture(cached: SolidColorTextureCache) {
     // 值
     const preferredFormat = StaticTextureUtil.renderFormat.split("-")[0];
     // 贴图和采样器

@@ -355,3 +355,10 @@ export class StorageTextureToCanvas {
     return canvasReturn;
   }
 }
+
+export class Logger {
+  static production: boolean = false;
+  static log(...msg: any[]) {
+    if (!Logger.production) console.log(...msg);
+  }
+}

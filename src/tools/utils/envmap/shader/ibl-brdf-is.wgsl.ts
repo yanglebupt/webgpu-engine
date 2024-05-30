@@ -1,3 +1,4 @@
+import { Logger } from "../../../helper";
 import {
   Coord,
   textureFilter,
@@ -21,7 +22,7 @@ export default (
   const [width_idx, height_idx, sampler_idx] = order;
   const sample_axis = axis[sampler_idx];
   const sampleChunk = chunkSize[sampler_idx];
-  console.log(`N: u32(${sampleChunk})*${dispatch_sample}`);
+  Logger.log(`N: u32(${sampleChunk})*${dispatch_sample}`);
   let mipLevelStr = `const mipLevels: array<f32, ${mipLevels.length}> = array(`;
   mipLevels.forEach((l) => (mipLevelStr += `${l},`));
   mipLevelStr += ");";

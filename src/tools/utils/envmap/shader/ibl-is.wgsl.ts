@@ -5,6 +5,7 @@ import {
   textureUV,
 } from "../../../../tools/shaders/utils";
 import { IDX, axis } from "../../../../tools/utils/Dispatch";
+import { Logger } from "../../../helper";
 
 export default (
   format: GPUTextureFormat,
@@ -17,7 +18,7 @@ export default (
   const [width_idx, height_idx, sampler_idx] = order;
   const sample_axis = axis[sampler_idx];
   const sampleChunk = chunkSize[sampler_idx];
-  console.log(`N: u32(${sampleChunk})*${dispatch_sample}`);
+  Logger.log(`N: u32(${sampleChunk})*${dispatch_sample}`);
   return /* wgsl */ `
 @group(0) @binding(0) var envMap: texture_storage_2d<${format}, read>;
 @group(0) @binding(1) var inverseCDFMap: texture_storage_2d<${format}, read>;

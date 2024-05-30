@@ -23,8 +23,8 @@ envMap.build({
   //@ts-ignore
   scene: null,
   cached: {
-    sampler: GPUSamplerCache.neww(device),
-    solidColorTexture: SolidColorTextureCache.neww(device),
+    sampler: new GPUSamplerCache(device),
+    solidColorTexture: new SolidColorTextureCache(device),
   },
 });
 

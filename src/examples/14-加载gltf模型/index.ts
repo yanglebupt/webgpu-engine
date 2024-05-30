@@ -7,8 +7,10 @@ import { DirectionLight, PointLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
 import { LoaderBarDomElement } from "./loaderBar";
 import { EnvMapLoader } from "../../tools/utils/envmap";
+import { Logger } from "../../tools/helper";
 
 const base = location.href;
+Logger.production = false;
 
 // 配置
 const model_gltf_configs: Record<
