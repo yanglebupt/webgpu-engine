@@ -5,7 +5,7 @@ import {
   makeShaderDataDefinitions,
   makeStructuredView,
 } from "webgpu-utils";
-import { createComputePipeline, createRenderPipeline } from "../..";
+import { createComputePipeline } from "../..";
 import { Logger, createEmptyStorageTexture } from "../../helper";
 import { HDRLoader, HDRLoaderReturn } from "../../loaders/HDRLoader";
 import { DispatchCompute } from "../Dispatch";
@@ -196,7 +196,7 @@ export abstract class EnvMap
     // 渲染管线
     const { sampleType, type } = getFilterType(this.polyfill);
     this.renderPipeline = cached.pipeline.get(
-      { code: vertex, context: {} },
+      { code: vertex, context: { flipY: false } },
       { code: fragment, context: { polyfill: this.polyfill } },
       {
         format,

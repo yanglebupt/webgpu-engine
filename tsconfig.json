@@ -20,13 +20,12 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["@webgpu/types"]
   },
-  "include": ["src"],
+  "include": ["src", "types"],
   "exclude": [
     "src/examples/11-计算 shader 的高级用法/**/*.ts",
     "src/examples/04-贴图/**/*.ts",
     "src/examples/05-加载贴图/**/*.ts",
     "src/examples/09-cubemap贴图/**/*.ts",
-    "src/tools/loaders/ObjLoader/index.ts",
-    "docs"
+    "src/tools/loaders/ObjLoader/index.ts"
   ]
 }

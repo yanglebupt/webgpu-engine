@@ -1,7 +1,7 @@
 import { Mat4, mat4 } from "wgpu-matrix";
 import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
 import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
-import { ShaderLocation, ShaderModuleCode } from "../../shaders";
+import { ShaderLocation } from "../../shaders";
 import {
   makeShaderDataDefinitions,
   makeStructuredView,
@@ -11,7 +11,7 @@ import {
 import fragment, {
   M_U_NAME,
   MaterialUniform,
-} from "../../shaders/fragment-wgsl/pbr-light.wgsl";
+} from "../../shaders/fragment-wgsl/mesh/pbr-light.wgsl";
 import { fetchWithProgress } from "../../common";
 import { StaticTextureUtil } from "../../utils/StaticTextureUtil";
 import {
@@ -47,52 +47,6 @@ export function alignTo(val: number, align: number) {
   return Math.floor((val + align - 1) / align) * align;
 }
 
-export function fromRotationTranslationScale(
-  q: number[],
-  v: number[],
-  s: number[],
-  dist?: Mat4
-) {
-  const out = dist ?? mat4.create();
-  // Quaternion math
-  let x = q[0],
-    y = q[1],
-    z = q[2],
-    w = q[3];
-  let x2 = x + x;
-  let y2 = y + y;
-  let z2 = z + z;
-  let xx = x * x2;
-  let xy = x * y2;
-  let xz = x * z2;
-  let yy = y * y2;
-  let yz = y * z2;
-  let zz = z * z2;
-  let wx = w * x2;
-  let wy = w * y2;
-  let wz = w * z2;
-  let sx = s[0];
-  let sy = s[1];
-  let sz = s[2];
-  out[0] = (1 - (yy + zz)) * sx;
-  out[1] = (xy + wz) * sx;
-  out[2] = (xz - wy) * sx;
-  out[3] = 0;
-  out[4] = (xy - wz) * sy;
-  out[5] = (1 - (xx + zz)) * sy;
-  out[6] = (yz + wx) * sy;
-  out[7] = 0;
-  out[8] = (xz + wy) * sz;
-  out[9] = (yz - wx) * sz;
-  out[10] = (1 - (xx + yy)) * sz;
-  out[11] = 0;
-  out[12] = v[0];
-  out[13] = v[1];
-  out[14] = v[2];
-  out[15] = 1;
-  return out;
-}
-
 // 获取 modelMatrix
 export function readNodeTransform(node: GLTFNode) {
   if (node.matrix) return mat4.create(...node.matrix);
@@ -100,7 +54,7 @@ export function readNodeTransform(node: GLTFNode) {
     let scale = node.scale ?? [1, 1, 1];
     let rotation = node.rotation ?? [0, 0, 0, 1]; // 四元数
     let translation = node.translation ?? [0, 0, 0];
-    return fromRotationTranslationScale(rotation, translation, scale);
+    return mat4.fromRotationTranslationScale(rotation, translation, scale);
   }
 }
 
@@ -623,7 +577,7 @@ export class GLTFScene implements Renderable, Buildable {
     this.a_nodes.forEach((a_node) => {
       const renderNode: RenderNodeMatrix = {
         matrix: a_node.matrix,
-        normalMatrix: a_node.calcNormalMatrix(),
+        normalMatrix: a_node.normalMatrix,
       };
       a_node.a_mesh.primitives.forEach((primitive) => {
         const primitiveNodesKey = JSON.stringify(primitive);
@@ -639,7 +593,7 @@ export class GLTFScene implements Renderable, Buildable {
 
     // 将所有 primitive - node，创建一个大的 instance bind group
     const instanceBuffer = device.createBuffer({
-      size: 16 * 2 * 4 * primitiveInstances.total,
+      size: 16 * 2 * Float32Array.BYTES_PER_ELEMENT * primitiveInstances.total,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
@@ -762,7 +716,7 @@ export class GLTFScene implements Renderable, Buildable {
     const nodes = primitiveNodesMap.get(JSON.stringify(primitive.__json))!;
     const count = nodes.length;
     const instanceBuffer = device.createBuffer({
-      size: 16 * 2 * 4 * count,
+      size: 16 * 2 * Float32Array.BYTES_PER_ELEMENT * count,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
@@ -895,20 +849,19 @@ export class GLTFFlattenNode implements FlattenNode {
     this.matrix = node.matrix;
   }
 
-  calcNormalMatrix() {
+  get normalMatrix() {
     return mat4.transpose(mat4.inverse(this.matrix));
   }
 
   makeBindGroup(device: GPUDevice, bindGroupLayout: GPUBindGroupLayout) {
     const modelMatrixBuffer = device.createBuffer({
-      size: 16 * 4 * 2,
+      size: 16 * 2 * Float32Array.BYTES_PER_ELEMENT,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
-    const normalMatrix = this.calcNormalMatrix();
     new Float32Array(modelMatrixBuffer.getMappedRange()).set([
       ...this.matrix,
-      ...normalMatrix,
+      ...this.normalMatrix,
     ]);
     modelMatrixBuffer.unmap();
     this.bindGroup = device.createBindGroup({
@@ -970,10 +923,11 @@ export class GLTFPrimitive {
         doubleSided: this.a_material?.doubleSided ?? false,
         shaderContext: {
           vertex: {
+            useNormal: "NORMAL" in this.attributes,
             useTexcoord: "TEXCOORD_0" in this.attributes,
-            useAlphaCutoff: alphaMode == "MASK",
           },
           fragment: {
+            useAlphaCutoff: alphaMode == "MASK",
             polyfill,
           },
         },
@@ -1194,6 +1148,7 @@ export class GLTFBufferView {
     if (!this.bitmap)
       throw new Error("Can't upload texture without create bitmap");
     const size = [this.bitmap.width, this.bitmap.height];
+    this.texture?.destroy();
     this.texture = createTextureFromSource(mipmap.device, this.bitmap, {
       mips: false,
       usage:
@@ -1208,10 +1163,6 @@ export class GLTFBufferView {
       // @ts-ignore
       if (closed) mipmap = null;
     }
-  }
-
-  set mips(mips: boolean) {
-    this.texture?.createView({});
   }
 
   // 最小的 bufferView，不再进行切分了

@@ -1,4 +1,5 @@
 import { Scene } from ".";
+import { EntityObject } from "../entitys/EntityObject";
 import {
   GPUBindGroupLayoutCache,
   GPURenderPipelineCache,
@@ -10,24 +11,24 @@ export class Type {
   static getClassName(obj: Object) {
     return obj.constructor.name;
   }
-  static is(obj: Object3D, name: string) {
+  static is(obj: Addable, name: string) {
     return Reflect.has(obj, name);
   }
-  static isRenderable(obj: Object3D) {
+  static isRenderable(obj: Addable) {
     return Type.is(obj, "render");
   }
-  static isBuildable(obj: Object3D) {
+  static isBuildable(obj: Addable) {
     return Type.is(obj, "build");
   }
-  static isUpdatable(obj: Object3D) {
+  static isUpdatable(obj: Addable) {
     return Type.is(obj, "update");
   }
-  static isComputable(obj: Object3D) {
+  static isComputable(obj: Addable) {
     return Type.is(obj, "compute");
   }
 }
 
-export type Object3D =
+export type Addable =
   | VirtualView
   | Buildable
   | Updatable
@@ -68,7 +69,7 @@ export interface Buildable {
   examples: OrbitController
 */
 export interface Updatable {
-  update(): void;
+  update(device?: GPUDevice): void;
 }
 
 /*

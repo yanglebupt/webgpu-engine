@@ -5,7 +5,9 @@ export enum ShaderLocation {
   TANGENT = 3,
 }
 
-export type ShaderModuleCode = (context: Record<string, any>) => string;
+export type ShaderModuleCode<T = Record<string, any>> = (
+  context: ShaderContext<T>
+) => string;
 
 export type ShaderContext<T = Record<string, any>> = T;
 

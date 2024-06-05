@@ -145,8 +145,14 @@ export function dispatch(
   };
 }
 
-export const axis = ["x", "y", "z"];
+export enum Axis {
+  x = 0,
+  y = 1,
+  z = 2,
+}
+export type AxisType = "x" | "y" | "z";
 export type IDX = 0 | 1 | 2;
+export const axis = ["x", "y", "z"];
 
 export function dispatchImageAndSampler(
   image: [number, number],

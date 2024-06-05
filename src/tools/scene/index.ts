@@ -11,7 +11,7 @@ import {
 import {
   BuildOptions,
   Buildable,
-  Object3D,
+  Addable,
   Renderable,
   Type,
   Updatable,
@@ -112,10 +112,10 @@ export class Scene implements Renderable {
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     });
 
-    this.makeBindGroup(1);
+    this.makeBindGroup();
   }
 
-  add(obj: Object3D) {
+  add(obj: Addable) {
     if (Type.isBuildable(obj)) {
       (obj as Buildable).build(this.buildOptions);
     }
@@ -130,21 +130,26 @@ export class Scene implements Renderable {
         以 this.maxLight 为间隔，当每次超过后再进行扩容，防止频繁更新
       */
       if (this.lightCount > 1 && this.lightCount % this.maxLight == 1) {
-        this.makeBindGroup(Math.floor(this.lightCount / this.maxLight) + 1);
+        this.makeBindGroup();
       }
-    } else if (Type.isUpdatable(obj)) {
-      if (obj instanceof OrbitController) this.add(obj.camera);
-      this.updates.push(obj as Updatable);
-    } else if (Type.isRenderable(obj)) {
-      this.children.push(obj as Renderable);
     } else {
-      throw new Error(`Unsupported object type: ${Type.getClassName(obj)}`);
+      if (Type.isUpdatable(obj)) {
+        if (obj instanceof OrbitController) this.add(obj.camera);
+        this.updates.push(obj as Updatable);
+      }
+      if (Type.isRenderable(obj)) {
+        this.children.push(obj as Renderable);
+      }
     }
   }
 
-  makeBindGroup(size: number) {
+  get lightBufferSize() {
+    return Math.floor(this.lightCount / this.maxLight) + 1;
+  }
+
+  makeBindGroup() {
     this.buffers[1] = this.device.createBuffer({
-      size: Light.getViewSize(this.maxLight * size),
+      size: Light.getViewSize(this.maxLight * this.lightBufferSize),
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
     this.bindGroup = this.device.createBindGroup({
@@ -204,7 +209,7 @@ export class Scene implements Renderable {
     this.buffers[3] = hasEnvMap
       ? this.options.envMap!.specularTexure.createView()
       : this.buildOptions.cached.solidColorTexture.default.createView();
-    this.makeBindGroup(1);
+    this.makeBindGroup();
   }
 
   render(renderPass: GPURenderPassEncoder): void;
@@ -214,7 +219,7 @@ export class Scene implements Renderable {
       this.renderer.render(this);
     } else {
       if (!this.mainCamera) return;
-      this.updates.forEach((update) => update.update());
+      this.updates.forEach((update) => update.update(this.device));
       if (this.options.showEnvMap)
         this.options.envMap?.render(renderPass, this.device, this.mainCamera);
       this.setBuffers();

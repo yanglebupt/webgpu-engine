@@ -5,8 +5,8 @@ import {
   L_NAME,
   LightGroupBinding,
   ShaderContext,
-} from "..";
-import { Coord, textureFilter } from "../utils";
+} from "../..";
+import { Coord, textureFilter } from "../../utils";
 
 export const M_U_NAME = "material";
 export const MaterialUniform = /* wgsl */ `
@@ -25,7 +25,12 @@ struct Material {
 @group(2) @binding(0) var<uniform> ${M_U_NAME}: Material;
 `;
 
-export default (context: ShaderContext) => {
+interface ShaderContextParameter {
+  polyfill: boolean;
+  useAlphaCutoff: boolean;
+}
+
+export default (context: ShaderContext<ShaderContextParameter>) => {
   return wgsl/* wgsl */ `
 
 const PI = 3.141592653589793;
@@ -146,6 +151,22 @@ fn irradiance_point_light(in_light: InputLight, pos: vec3f, n: vec3f) -> Light {
   light.ir = irradiance * rgb2lin(in_light.color.rgb);
   return light;
 }
+
+// fn irradiance_spot_light(in_light: InputLight, pos: vec3f, n: vec3f) -> Light {
+//   var light: Light;
+//   let lightDir = in_light.pos - pos;
+//   let r = length(lightDir);
+//   let l = normalize(lightDir);
+//   let nv = in_light.n;
+//   let beta_max = in_light.beta_max;
+//   let d = in_light.d;
+//   let cos_beta = dot(d, -l);
+//   let p = (nv+1.0)*pow(cos_beta, nv)*max(dot(l,n),0.0)/(1.0-pow(cos(beta_max), nv+1.0));
+//   let irradiance = p*in_light.flux / (2.0 * PI * pow(r, 2.0));
+//   light.dir = l;
+//   light.ir = irradiance * rgb2lin(in_light.color.rgb);
+//   return light;
+// }
 
 fn radiance_render(brdf: vec3f, ir: vec3f) -> vec3f {
   return brdf * ir;

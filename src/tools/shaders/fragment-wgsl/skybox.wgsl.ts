@@ -2,7 +2,13 @@ import { wgsl } from "wgsl-preprocessor";
 import { textureFilter } from "../utils";
 import { ShaderContext } from "..";
 
-export default (context: ShaderContext) => wgsl/*wgsl*/ `
+interface ShaderContextParameter {
+  polyfill: boolean;
+}
+
+export default (
+  context: ShaderContext<ShaderContextParameter>
+) => wgsl/*wgsl*/ `
 
 const PI = 3.141592653589793;
 

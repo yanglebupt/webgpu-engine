@@ -1,6 +1,10 @@
 import { ShaderContext } from "..";
 
-export default (context: ShaderContext) => /* wgsl */ `
+interface ShaderContextParameter {
+  flipY: boolean;
+}
+
+export default (context: ShaderContext<ShaderContextParameter>) => /* wgsl */ `
   struct VaryStruct {
     @builtin(position) position: vec4f,
     @location(0) tc: vec2f,

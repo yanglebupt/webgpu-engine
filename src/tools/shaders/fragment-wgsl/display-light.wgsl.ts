@@ -1,6 +1,4 @@
-import { ShaderContext } from "..";
-
-export default (context: ShaderContext) => /* wgsl */ `
+export default () => /* wgsl */ `
 const lightDir = vec3f(0, -1, 0);
 const lightColor = vec3f(0.5);
 const ambientColor = vec3f(0.5);

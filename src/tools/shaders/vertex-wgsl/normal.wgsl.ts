@@ -8,10 +8,18 @@ import {
 } from "..";
 import { wgsl } from "wgsl-preprocessor";
 
-export default (context: ShaderContext) => wgsl/* wgsl */ `
+interface ShaderContextParameter {
+  useTexcoord: boolean;
+  useNormal: boolean;
+}
+
+export default (context: ShaderContext<ShaderContextParameter>) => {
+  return wgsl/* wgsl */ `
 struct VertexInput {
   @location(${ShaderLocation.POSITION}) position: vec4f,
+#if ${context.useNormal}
   @location(${ShaderLocation.NORMAL}) normal: vec3f,
+#endif
 #if ${context.useTexcoord}
   @location(${ShaderLocation.TEXCOORD_0}) uv0: vec2f,
 #endif
@@ -39,13 +47,16 @@ fn main(
     o.pos = pos.xyz/pos.w;
     o.cameraPos = ${VP_NAME}.cameraPosition;
     o.position = ${VP_NAME}.projectionMatrix * ${VP_NAME}.viewMatrix * pos;
+    #if ${context.useNormal}
     o.normal = (modelTransform.normalMatrix * vec4f(vert.normal, 0)).xyz;
-    #if ${context.useTexcoord}
-      o.uv0 = vert.uv0;
     #else
-      o.uv0 = vec2f(0);
+    o.normal = vec3f(0);
+    #endif
+    #if ${context.useTexcoord}
+    o.uv0 = vert.uv0;
+    #else
+    o.uv0 = vec2f(0);
     #endif
     return o;
+};`;
 };
-
-`;

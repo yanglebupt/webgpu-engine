@@ -102,12 +102,12 @@ async function frame() {
 ![](./public/assets/IBL-IS.png)
 
 
+## TODO
+
+文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
+
+gltf 尝试合并 bindgroup 1 和 2，并尝试接入 Geometry 和 Material
+
 # 后续进度
 
 - 完善 gltf 中的骨骼动画
-- 开发一个基于 WebGPU 的小引擎（其实从加载 GLTF 这个案例已经可以看到雏形了），主要功能如下
-  - 立方体的几何形状，其他形状可以进行自定义
-  - 支持对形状进行基本的几何变换
-  - 支持基本材质，可以设置颜色和各种贴图，并且受光源影响
-  - 支持单一光源
-  - 支持场景节点树

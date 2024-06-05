@@ -121,27 +121,27 @@ class GPUShaderCodeCache extends ObjectStringKeyCache<
   }
 }
 type GPURenderPipelineCacheShaderKey = { id: string; context: ShaderContext };
-type GPUShaderModuleCacheKey = {
-  code: ShaderModuleCode;
+export type GPUShaderModuleCacheKey<T = Record<string, any>> = {
+  code: ShaderModuleCode<T>;
   context: ShaderContext;
 };
 type GPUShaderModuleCacheReturn = { id: string; module: GPUShaderModule };
 export class GPUShaderModuleCache {
   private cached: Map<ShaderModuleCode, GPUShaderCodeCache> = new Map();
   constructor(public device: GPUDevice) {}
-  get(options: GPUShaderModuleCacheKey): GPUShaderModuleCacheReturn;
-  get(options: GPURenderPipelineCacheShaderKey): GPUShaderModuleCacheReturn;
-  get(
+  get<T>(options: GPUShaderModuleCacheKey<T>): GPUShaderModuleCacheReturn;
+  get<T>(options: GPURenderPipelineCacheShaderKey): GPUShaderModuleCacheReturn;
+  get<T>(
     code: ShaderModuleCode,
     context: ShaderContext
   ): GPUShaderModuleCacheReturn;
-  get(id: string, context: ShaderContext): GPUShaderModuleCacheReturn;
-  get(
+  get<T>(id: string, context: ShaderContext): GPUShaderModuleCacheReturn;
+  get<T>(
     _code:
       | ShaderModuleCode
       | string
       | GPURenderPipelineCacheShaderKey
-      | GPUShaderModuleCacheKey,
+      | GPUShaderModuleCacheKey<T>,
     _context?: ShaderContext
   ) {
     let code: ShaderModuleCode | undefined;
@@ -239,7 +239,7 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
     this.shaderCached = new GPUShaderModuleCache(device);
   }
 
-  getBlend(alphaMode?: BlendMode) {
+  private getBlend(alphaMode?: BlendMode) {
     switch (alphaMode) {
       case "BLEND":
         return {
@@ -283,9 +283,9 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
   }
 
   // @ts-ignore
-  get(
-    vertex: GPUShaderModuleCacheKey,
-    fragment: GPUShaderModuleCacheKey,
+  get<T, B>(
+    vertex: GPUShaderModuleCacheKey<T>,
+    fragment: GPUShaderModuleCacheKey<B>,
     args: GPURenderPipelineCacheArgsKey,
     // 后面很多情况需要自己手动创建 layout，可以通过 label 来标识唯一但很难使用
     // 还是需要自己来标识唯一

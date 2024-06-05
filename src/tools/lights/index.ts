@@ -12,6 +12,7 @@ import { VirtualView } from "../scene/types";
 export enum LightType {
   DIRECTION = 1,
   POINT = 2,
+  SPOT = 3,
 }
 
 export interface Light {
@@ -66,6 +67,20 @@ export class DirectionLight extends Light {
 export class PointLight extends Light {
   public type = LightType.POINT;
   constructor(public pos: Vec3, public color: Vec4, public flux: number) {
+    super();
+  }
+}
+
+export class SpotLight extends Light {
+  public type = LightType.SPOT;
+  constructor(
+    public pos: Vec3,
+    public color: Vec4,
+    public flux: number,
+    public max_angle: number,
+    public main_direction: Vec3,
+    public focus: number
+  ) {
     super();
   }
 }
