@@ -47,7 +47,7 @@ gui
 gui.add(settings, "wireframe");
 
 export function frame() {
-  mesh.wireframe = settings.wireframe;
+  mesh.material.wireframe = settings.wireframe;
   scene.render();
   requestAnimationFrame(frame);
 }

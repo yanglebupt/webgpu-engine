@@ -12,7 +12,7 @@ import { Observable, ObservableProxy } from "../utils/Observable";
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
  */
-class MeshRenderer<
+export class Mesh<
     G extends Geometry = Geometry,
     M extends MeshMaterial = MeshMaterial
   >
@@ -20,9 +20,11 @@ class MeshRenderer<
   implements
     Buildable,
     Updatable,
-    Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>,
-    Observable
+    Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
+  public geometry: G;
+  public material: M;
+
   private buildOptions!: BuildOptions;
   private renderPipeline!: GPURenderPipeline;
 
@@ -52,13 +54,14 @@ class MeshRenderer<
     vertexResources: GPUResource[];
   };
 
-  constructor(public geometry: G, public material: M) {
+  constructor(geometry: G, material: M) {
     super();
+    this.geometry = geometry;
+    this.material = new ObservableProxy(
+      material,
+      this.onChange.bind(this)
+    ) as M;
   }
-
-  ////////////// watch ///////////////////
-  public wireframe: boolean = false;
-  watch: PropertyKey[] = ["wireframe"];
 
   onChange(propertyKey: PropertyKey): void {
     switch (propertyKey) {
@@ -97,7 +100,7 @@ class MeshRenderer<
   }
 
   buildGeometry(device: GPUDevice) {
-    const geometry = this.wireframe
+    const geometry = this.material.wireframe
       ? new WireframeGeometry(this.geometry)
       : this.geometry;
     const indexFormat = geometry.indexFormat;
@@ -238,7 +241,7 @@ class MeshRenderer<
          * 生成 line-list 需要注意，不要添加了重复的线
          */
         primitive: {
-          topology: this.wireframe ? "line-list" : "triangle-list",
+          topology: this.material.wireframe ? "line-list" : "triangle-list",
         },
         depthStencil: {
           format: options.depthFormat,
@@ -262,14 +265,5 @@ class MeshRenderer<
     this.buildMaterial(options);
     /////////////////// 创建 pipeline //////////////////
     this.buildPipeline(options);
-  }
-}
-
-export class Mesh<
-  G extends Geometry = Geometry,
-  M extends MeshMaterial = MeshMaterial
-> extends ObservableProxy<MeshRenderer<G, M>> {
-  constructor(geometry: G, material: M) {
-    super(new MeshRenderer(geometry, material));
   }
 }
