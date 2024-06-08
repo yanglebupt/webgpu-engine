@@ -10,9 +10,15 @@ import { CircleGeometry } from "../../tools/geometrys/CircleGeometry";
 import { SphereGeometry } from "../../tools/geometrys/SphereGeometry";
 import { CylinderGeometry } from "../../tools/geometrys/CylinderGeometry";
 import { TorusGeometry } from "../../tools/geometrys/TorusGeometry";
+import { CubeGeometry } from "../../tools/geometrys/CubeGeometry";
+import { BlendingPreset } from "../../tools/utils/Blend";
+import "./index.css";
 
 // 新建一个 WebGPURenderer
-const renderer = (await new WebGPURenderer()
+const renderer = (await new WebGPURenderer({
+  alphaMode: "premultiplied",
+  backgroundColor: [0, 1, 0, 0.5],
+})
   .checkSupport()
   .catch(({ message }) => {
     const div = document.createElement("div");
@@ -31,12 +37,14 @@ const orbitController = new OrbitController(camera, renderer.canvas, {
 });
 scene.add(orbitController);
 
-const mesh = new Mesh(new SphereGeometry(), new MeshBasicMaterial());
+const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
 scene.add(mesh);
 
+// mesh.material.blendingPreset = BlendingPreset.SourceIn;
+
 const settings = {
-  color: [255, 0, 0, 0],
-  wireframe: true,
+  color: [255, 0, 0, 128],
+  wireframe: false,
 };
 const gui = new GUI();
 gui

@@ -5,6 +5,7 @@ import { Logger } from "../helper";
 import { ShaderContext, ShaderModuleCode } from "../shaders";
 import { v4 as uuidv4 } from "uuid";
 import { CreateAndSetRecord } from "../loaders";
+import { BlendingPreset } from "../utils/Blend";
 /**
  * 使用 lodash.isEqual 来深度比较两个对象是否一样
  */
@@ -214,6 +215,7 @@ type GPURenderPipelineCacheArgsKey = {
   doubleSided?: boolean;
   bufferLayout?: GPUVertexBufferLayout[];
   record?: CreateAndSetRecord;
+  blending?: GPUBlendState;
 };
 type GPURenderPipelineCacheKey = {
   vertex: GPURenderPipelineCacheShaderKey;
@@ -258,9 +260,9 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
       record,
     }: GPURenderPipelineCreateOptions
   ): GPURenderPipeline {
-    const blend = this.getBlend(args.alphaMode);
+    const blend = this.getBlend(args.alphaMode) ?? args.blending;
     record && record.pipelineCount++;
-    console.log("create pipeline");
+    Logger.log("create pipeline");
     return this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts }),
       vertex: {

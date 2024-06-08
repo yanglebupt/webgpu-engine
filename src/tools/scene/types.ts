@@ -59,6 +59,8 @@ export interface BuildOptions {
   depthFormat: GPUTextureFormat;
   cached: BuildCache;
   scene: Scene;
+  antialias: boolean;
+  alphaMode: GPUCanvasAlphaMode;
 }
 export interface Buildable {
   build(options: BuildOptions): void;

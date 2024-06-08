@@ -7,6 +7,7 @@ import { BuildOptions, Buildable, Renderable, Updatable } from "../scene/types";
 import { ShaderLocation } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import { GPUResource } from "../type";
+import { BlendPresetMap, getBlendFromPreset } from "../utils/Blend";
 import { Observable, ObservableProxy } from "../utils/Observable";
 
 /**
@@ -230,6 +231,9 @@ export class Mesh<
   buildPipeline(options: BuildOptions) {
     const { vertex, bufferLayout } = this.geometryBuildResult;
     const { fragment, bindGroupLayouts } = this.materialBuildResult;
+    const blending = this.material.blendingPreset
+      ? getBlendFromPreset(this.material.blendingPreset)
+      : this.material.blending;
     this.renderPipeline = options.cached.pipeline.get(
       vertex,
       fragment,
@@ -248,7 +252,9 @@ export class Mesh<
           depthWriteEnabled: true,
           depthCompare: "less",
         },
+        ...(options.antialias ? { multisample: { count: 4 } } : undefined),
         bufferLayout,
+        ...(blending ? { blending } : undefined),
       },
       bindGroupLayouts
     );

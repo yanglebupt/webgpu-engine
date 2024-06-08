@@ -142,6 +142,7 @@ export abstract class EnvMap
     format,
     depthFormat = StaticTextureUtil.depthFormat,
     cached,
+    antialias,
   }: BuildOptions) {
     const { color, width, height } = this.hdrReturn;
     const { mipmaps } = this.options ?? {};
@@ -206,6 +207,7 @@ export abstract class EnvMap
           depthWriteEnabled: true,
           depthCompare: "less-equal",
         },
+        ...(antialias ? { multisample: { count: 4 } } : {}),
       },
       [
         cached.bindGroupLayout.get([

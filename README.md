@@ -102,6 +102,12 @@ async function frame() {
 ![](./public/assets/IBL-IS.png)
 
 
+## 框架说明
+
+\>>> 设计文档 飞书 Docs Link: https://qwuzvjx4mo.feishu.cn/drive/folder/TMj3fNBnFlRqNjdpPF0ch8XHnqH Password: 54@T9451 
+
+API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material 可以直接从 threejs 源码中拷贝过来就可以用
+
 ## TODO
 
 文件目录结构保持一致，现在大小写混乱 camera/light/loader/....

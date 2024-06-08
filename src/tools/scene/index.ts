@@ -49,6 +49,8 @@ export class Scene implements Renderable {
       depthFormat: this.renderer.depthFormat,
       cached: this.renderer.cached!,
       scene: this,
+      antialias: this.renderer.antialias,
+      alphaMode: this.renderer.alphaMode,
     };
     Logger.log(this.buildOptions.cached);
     const entries: GPUBindGroupLayoutEntry[] = [

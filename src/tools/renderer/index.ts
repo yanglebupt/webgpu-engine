@@ -23,6 +23,8 @@ export interface WebGPURenderer {
   width: number;
   height: number;
   aspect: number;
+  antialias: boolean;
+  alphaMode: GPUCanvasAlphaMode;
 }
 
 export class WebGPURenderer {
@@ -30,9 +32,17 @@ export class WebGPURenderer {
   public className?: string;
   public parentID?: string;
   public cached?: BuildCache;
-  constructor(options?: { className?: string; parentID?: string }) {
-    this.className = options?.className;
-    this.parentID = options?.parentID;
+  public backgroundColor!: GPUColor;
+  constructor(
+    options?: Partial<{
+      className: string;
+      parentID: string;
+      antialias: boolean;
+      backgroundColor: GPUColor;
+      alphaMode: GPUCanvasAlphaMode;
+    }>
+  ) {
+    Object.assign(this, options);
   }
 
   private static __collectDeviceFeatures() {
@@ -54,7 +64,7 @@ export class WebGPURenderer {
     const canvasReturn = createCanvas(
       500,
       500,
-      { device, format },
+      { device, format, alphaMode: this.alphaMode },
       this.className,
       this.parentID
     );
@@ -72,6 +82,21 @@ export class WebGPURenderer {
     return this;
   }
 
+  private get clearColor() {
+    // 所有使用的颜色都需要考虑 预乘 alpha
+    const bg = this.backgroundColor as Array<number>;
+    const { r, g, b, a } = Reflect.has(bg, "x")
+      ? (bg as unknown as GPUColorDict)
+      : { r: bg[0], g: bg[1], b: bg[2], a: bg[3] };
+    const color = { r, g, b, a };
+    if (this.alphaMode === "premultiplied") {
+      color.r *= a;
+      color.g *= a;
+      color.b *= a;
+    }
+    return color;
+  }
+
   render(scene: Scene) {
     const encoder = this.device.createCommandEncoder();
     // 非实时计算，只需要一次即可
@@ -83,16 +108,31 @@ export class WebGPURenderer {
       computePass.end();
     }
     const canvasTexture = this.ctx.getCurrentTexture();
-    const depthTexture = StaticTextureUtil.createDepthTexture(this.device, [
-      canvasTexture.width,
-      canvasTexture.height,
-    ]);
+    const depthTexture = StaticTextureUtil.createDepthTexture(
+      this.device,
+      [canvasTexture.width, canvasTexture.height],
+      this.antialias ? 4 : undefined
+    );
+    const multisampleTexture = this.antialias
+      ? StaticTextureUtil.createMultiSampleTexture(
+          this.device,
+          [canvasTexture.width, canvasTexture.height],
+          4,
+          this.format
+        )
+      : null;
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
           loadOp: "clear",
           storeOp: "store",
-          view: canvasTexture.createView(),
+          clearValue: this.clearColor,
+          view: this.antialias
+            ? multisampleTexture!.createView()
+            : canvasTexture.createView(),
+          resolveTarget: this.antialias
+            ? canvasTexture.createView()
+            : undefined,
         },
       ],
       depthStencilAttachment: {

@@ -17,6 +17,7 @@ export class StaticTextureUtil {
   static createDepthTexture(
     device: GPUDevice,
     size: [number, number],
+    sampleCount?: number,
     format?: GPUTextureFormat
   ) {
     if (
@@ -29,6 +30,7 @@ export class StaticTextureUtil {
         size,
         format: format ?? StaticTextureUtil.depthFormat,
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        sampleCount: sampleCount,
       });
     }
     return StaticTextureUtil.depthTexture;
@@ -37,7 +39,7 @@ export class StaticTextureUtil {
   static createMultiSampleTexture(
     device: GPUDevice,
     size: [number, number],
-    sampleCount: number,
+    sampleCount: number = 4,
     format?: GPUTextureFormat
   ) {
     if (
