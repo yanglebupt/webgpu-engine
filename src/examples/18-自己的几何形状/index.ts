@@ -3,7 +3,7 @@ import { OrbitController, PerspectiveCamera } from "../../tools/camera";
 import { degToRad } from "../../tools/math";
 import { WebGPURenderer } from "../../tools/renderer";
 import { Scene } from "../../tools/scene";
-import { Mesh } from "../../tools/meshs/Mesh";
+import { Mesh } from "../../tools/objects/Mesh";
 import { PlaneGeometry } from "../../tools/geometrys/PlaneGeometry";
 import { MeshBasicMaterial } from "../../tools/materials/MeshBasicMaterial";
 import { CircleGeometry } from "../../tools/geometrys/CircleGeometry";
@@ -13,6 +13,9 @@ import { TorusGeometry } from "../../tools/geometrys/TorusGeometry";
 import { CubeGeometry } from "../../tools/geometrys/CubeGeometry";
 import { BlendingPreset } from "../../tools/utils/Blend";
 import "./index.css";
+import { Clock } from "../../tools/utils/Clock";
+import { RotateScript, RotateScriptOptions } from "./RotateScript";
+import { ObjLoader } from "../../tools/loaders/ObjLoader";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
@@ -38,13 +41,13 @@ const orbitController = new OrbitController(camera, renderer.canvas, {
 scene.add(orbitController);
 
 const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
+const cpn = mesh.addComponent(RotateScript);
 scene.add(mesh);
-
-// mesh.material.blendingPreset = BlendingPreset.SourceIn;
 
 const settings = {
   color: [255, 0, 0, 128],
-  wireframe: false,
+  stop: false,
+  wireframe: true,
 };
 const gui = new GUI();
 gui
@@ -53,6 +56,7 @@ gui
     (color: number[]) => (mesh.material.color = color.map((v) => v / 255))
   );
 gui.add(settings, "wireframe");
+gui.add(settings, "stop").onChange((s) => (cpn.stop = s));
 
 export function frame() {
   mesh.material.wireframe = settings.wireframe;

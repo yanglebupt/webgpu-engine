@@ -4,9 +4,13 @@ import {
   VertexAttributeElementSize,
 } from "./Geometry";
 
-// https://github.com/mrdoob/three.js/blob/master/src/geometries/WireframeGeometry.js
+// modify from https://github.com/mrdoob/three.js/blob/master/src/geometries/WireframeGeometry.js
 
-function isUniqueEdge(start: number[], end: number[], edges: Set<string>) {
+export function isUniqueEdge(
+  start: number[],
+  end: number[],
+  edges: Set<string>
+) {
   const hash1 = `${start[0]},${start[1]},${start[2]}-${end[0]},${end[1]},${end[2]}`;
   const hash2 = `${end[0]},${end[1]},${end[2]}-${start[0]},${start[1]},${start[2]}`; // coincident edge
 
@@ -19,7 +23,7 @@ function isUniqueEdge(start: number[], end: number[], edges: Set<string>) {
   }
 }
 
-function isUniqueVertex(vertex: number[], vertices: Array<number[]>) {
+export function isUniqueVertex(vertex: number[], vertices: Array<number[]>) {
   const hash = vertex.join(",");
   const idx = vertices.findIndex((v) => v.join(",") === hash);
   if (idx >= 0) {
@@ -92,6 +96,8 @@ export class WireframeGeometry extends Geometry {
       }
     }
 
+    edges.clear();
+
     this.positions = new BufferAttribute(
       new Float32Array(vertices.flat()),
       VertexAttributeElementSize.POSITION
@@ -100,7 +106,5 @@ export class WireframeGeometry extends Geometry {
       new Uint16Array(_indices),
       VertexAttributeElementSize.INDICE
     );
-
-    edges.clear();
   }
 }

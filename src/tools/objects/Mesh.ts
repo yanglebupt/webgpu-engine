@@ -3,12 +3,14 @@ import { Geometry } from "../geometrys/Geometry";
 import { WireframeGeometry } from "../geometrys/WireframeGeometry";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
-import { BuildOptions, Buildable, Renderable, Updatable } from "../scene/types";
+import { BuildOptions, Buildable, Renderable } from "../scene/types";
 import { ShaderLocation } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import { GPUResource } from "../type";
-import { BlendPresetMap, getBlendFromPreset } from "../utils/Blend";
-import { Observable, ObservableProxy } from "../utils/Observable";
+import { getBlendFromPreset } from "../utils/Blend";
+import { ObservableProxy } from "../utils/Observable";
+
+let _meshId = 0;
 
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
@@ -20,11 +22,13 @@ export class Mesh<
   extends EntityObject
   implements
     Buildable,
-    Updatable,
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   public geometry: G;
   public material: M;
+  public name: string = "Mesh";
+  public description: string = "";
+  public id: number = _meshId++;
 
   private buildOptions!: BuildOptions;
   private renderPipeline!: GPURenderPipeline;
@@ -64,7 +68,7 @@ export class Mesh<
     ) as M;
   }
 
-  onChange(propertyKey: PropertyKey): void {
+  onChange(propertyKey: PropertyKey) {
     switch (propertyKey) {
       case "wireframe": {
         this.buildGeometry(this.buildOptions.device);
@@ -76,7 +80,8 @@ export class Mesh<
     }
   }
 
-  render(renderPass: GPURenderPassEncoder) {
+  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
+    this.updateBuffers(device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     const { bindGroup, bindGroupIndex } = this.materialBuildResult;
     renderPass.setPipeline(this.renderPipeline);
@@ -90,8 +95,7 @@ export class Mesh<
     }
   }
 
-  update(device: GPUDevice) {
-    this.transform.update();
+  updateBuffers(device: GPUDevice) {
     const { transformUniformValue, transformUniform } =
       this.componentBuildResult;
     transformUniformValue.set(this.transform.matrix, 0);

@@ -108,6 +108,10 @@ async function frame() {
 
 API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material 可以直接从 threejs 源码中拷贝过来就可以用
 
+## 目前困惑
+
+- alphaMode premultiplied 对于颜色该怎么处理，是在 shader 中弄还是外面直接对颜色处理
+
 ## TODO
 
 文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
@@ -117,3 +121,7 @@ gltf 尝试合并 bindgroup 1 和 2，并尝试接入 Geometry 和 Material
 # 后续进度
 
 - 完善 gltf 中的骨骼动画
+
+# 引用
+
+作为学习使用，geometrys 和 maths 从 threejs 中修改而来的

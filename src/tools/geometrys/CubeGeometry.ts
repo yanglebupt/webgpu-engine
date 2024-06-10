@@ -6,7 +6,7 @@ import {
 } from "./Geometry";
 import { buildPlane } from "./PlaneGeometry";
 
-// https://github.com/mrdoob/three.js/blob/r165/src/geometries/BoxGeometry.js
+// modify from https://github.com/mrdoob/three.js/blob/master/src/geometries/BoxGeometry.js
 
 export interface CubeGeometry {
   width: number;

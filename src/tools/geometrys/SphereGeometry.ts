@@ -5,6 +5,8 @@ import {
   VertexAttributeElementSize,
 } from "./Geometry";
 
+// modify from https://github.com/mrdoob/three.js/blob/master/src/geometries/SphereGeometry.js
+
 export interface SphereGeometry {
   radius: number;
   widthSegments: number;

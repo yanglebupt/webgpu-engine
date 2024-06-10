@@ -6,7 +6,7 @@ import {
   VertexAttributeElementSize,
 } from "./Geometry";
 
-// https://github.com/mrdoob/three.js/blob/r165/src/geometries/BoxGeometry.js
+// modify from https://github.com/mrdoob/three.js/blob/master/src/geometries/PlaneGeometry.js
 
 export function buildPlane(
   u: Axis,

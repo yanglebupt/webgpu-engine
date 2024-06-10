@@ -1,7 +1,10 @@
 import { Camera, OrbitController } from "../camera";
+import { Component } from "../components/Component";
+import { EntityObject } from "../entitys/EntityObject";
 import { Logger } from "../helper";
 import { Light } from "../lights";
 import { WebGPURenderer } from "../renderer";
+import { Clock } from "../utils/Clock";
 import {
   EnvMap,
   createSamplerByPolyfill,
@@ -30,16 +33,18 @@ export class Scene implements Renderable {
   public buildOptions: BuildOptions;
   public bindGroupLayout: GPUBindGroupLayout;
   public bindGroup!: GPUBindGroup;
+  public buffers: (GPUBuffer | GPUTextureView | GPUSampler)[] = [];
   public cameras: Camera[] = [];
   public mainCamera: Camera | null = null;
   public lights: Light[] = [];
-  public buffers: (GPUBuffer | GPUTextureView | GPUSampler)[] = [];
   public children: Renderable[] = [];
   public updates: Updatable[] = [];
   public needUpdateLightBuffer: boolean = true;
-  ////////////防止频繁更新light所在的bindgroup/////////////////
+  //////////// 防止频繁更新light所在的bindgroup /////////////////
   public maxLight: number = 50;
   public lightCount: number = 0;
+  public clock: Clock = new Clock();
+
   constructor(public renderer: WebGPURenderer, options?: SceneOption) {
     this.options = { showEnvMap: true, ...options };
     this.device = renderer.device;
@@ -121,6 +126,7 @@ export class Scene implements Renderable {
     if (Type.isBuildable(obj)) {
       (obj as Buildable).build(this.buildOptions);
     }
+    // VirtualView
     if (obj instanceof Camera) {
       this.cameras.push(obj);
       this.mainCamera = obj;
@@ -135,12 +141,12 @@ export class Scene implements Renderable {
         this.makeBindGroup();
       }
     } else {
+      if (Type.isRenderable(obj)) {
+        this.children.push(obj as Renderable);
+      }
       if (Type.isUpdatable(obj)) {
         if (obj instanceof OrbitController) this.add(obj.camera);
         this.updates.push(obj as Updatable);
-      }
-      if (Type.isRenderable(obj)) {
-        this.children.push(obj as Renderable);
       }
     }
   }
@@ -172,7 +178,7 @@ export class Scene implements Renderable {
     });
   }
 
-  setBuffers() {
+  updateBuffers() {
     Camera.view.set(this.mainCamera!.getBufferView());
     this.device.queue.writeBuffer(
       this.buffers[0] as GPUBuffer,
@@ -224,9 +230,24 @@ export class Scene implements Renderable {
       this.updates.forEach((update) => update.update(this.device));
       if (this.options.showEnvMap)
         this.options.envMap?.render(renderPass, this.device, this.mainCamera);
-      this.setBuffers();
+      this.updateBuffers();
       renderPass.setBindGroup(0, this.bindGroup);
-      this.children.forEach((child) => child.render(renderPass, this.device));
+      const dt = this.clock.deltaTime;
+      const t = this.clock.elapsedTime;
+      this.children.forEach((child) => {
+        if (child instanceof EntityObject) {
+          Object.values(Reflect.get(child, "components")).forEach((cpn) => {
+            if (cpn instanceof Component) {
+              if (!cpn.isStarted) {
+                cpn.start();
+                cpn.isStarted = true;
+              }
+              cpn.update(dt, t);
+            }
+          });
+        }
+        child.render(renderPass, this.device);
+      });
     }
   }
 }

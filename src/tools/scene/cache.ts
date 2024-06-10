@@ -5,7 +5,6 @@ import { Logger } from "../helper";
 import { ShaderContext, ShaderModuleCode } from "../shaders";
 import { v4 as uuidv4 } from "uuid";
 import { CreateAndSetRecord } from "../loaders";
-import { BlendingPreset } from "../utils/Blend";
 /**
  * 使用 lodash.isEqual 来深度比较两个对象是否一样
  */

@@ -5,6 +5,8 @@ import {
   VertexAttributeElementSize,
 } from "./Geometry";
 
+// modify from https://github.com/mrdoob/three.js/blob/master/src/geometries/CylinderGeometry.js
+
 export interface CylinderGeometry {
   radiusTop: number;
   radiusBottom: number;

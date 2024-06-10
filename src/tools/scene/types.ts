@@ -1,5 +1,4 @@
 import { Scene } from ".";
-import { EntityObject } from "../entitys/EntityObject";
 import {
   GPUBindGroupLayoutCache,
   GPURenderPipelineCache,
