@@ -6,14 +6,14 @@ import { Observable } from "../utils/Observable";
 export abstract class Material implements Buildable, Updatable, Observable {
   abstract watch: PropertyKey[];
   abstract update(device: GPUDevice): void;
-  abstract build(
+  abstract build<T = Record<string, any>>(
     options: BuildOptions,
-    bindGroupLayoutEntry?: GPUBindGroupLayoutEntry
+    bindGroupLayoutEntries?: GPUBindGroupLayoutEntry[]
   ): {
     bindGroupIndex: number;
     bindGroupLayout: GPUBindGroupLayout;
     bindGroupLayouts: GPUBindGroupLayout[];
     resources: GPUResource[];
-    fragment: GPUShaderModuleCacheKey;
+    fragment: GPUShaderModuleCacheKey<any>;
   };
 }

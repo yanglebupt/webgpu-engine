@@ -1,11 +1,17 @@
 # 学习和案例
-https://webgpufundamentals.org/webgpu/lessons/webgpu-fundamentals.html
+https://webgpufundamentals.org/webgpu/lessons/webgpu-fundamentals.html 
+
 https://webgpu.github.io/webgpu-samples/
+
 https://jinleili.github.io/learn-wgpu-zh/simuverse
 
 # 加载模型
+
 https://carmencincotti.com/2022-06-06/load-obj-files-into-webgpu/
-https://www.willusher.io/archive https://toji.dev/webgpu-gltf-case-study/
+
+https://www.willusher.io/archive 
+
+https://toji.dev/webgpu-gltf-case-study/
 
 # WGSL语言介绍
 

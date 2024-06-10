@@ -32,10 +32,19 @@ export const VertexAttributeElementSize: Record<VertexAttribute, number> = {
 
 export interface Geometry {
   positions: BufferAttribute<Float32Array>;
-  indices?: BufferAttribute<Uint16Array> | BufferAttribute<Uint32Array>;
+  indices?: BufferAttribute<Uint16Array | Uint32Array>;
   normals?: BufferAttribute<Float32Array>;
   uvs?: BufferAttribute<Float32Array>;
   indexFormat?: GPUIndexFormat;
+}
+
+export function U16IndicesToU32Indices(uint16Array: Uint16Array) {
+  const len = uint16Array.length;
+  const uint32Array = new Uint32Array(len);
+  for (let i = 0; i < len; i++) {
+    uint32Array[i] = uint16Array[i];
+  }
+  return uint32Array;
 }
 
 /**

@@ -148,7 +148,9 @@ export class CubeGeometry extends Geometry {
       VertexAttributeElementSize.UV
     );
     this.indices = new BufferAttribute(
-      new Uint16Array(attributes.indices),
+      new (this.indexFormat === "uint16" ? Uint16Array : Uint32Array)(
+        attributes.indices
+      ),
       VertexAttributeElementSize.INDICE
     );
   }

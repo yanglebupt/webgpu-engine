@@ -18,10 +18,7 @@ import { RotateScript, RotateScriptOptions } from "./RotateScript";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
 
 // 新建一个 WebGPURenderer
-const renderer = (await new WebGPURenderer({
-  alphaMode: "premultiplied",
-  backgroundColor: [0, 1, 0, 0.5],
-})
+const renderer = (await new WebGPURenderer()
   .checkSupport()
   .catch(({ message }) => {
     const div = document.createElement("div");
@@ -40,12 +37,13 @@ const orbitController = new OrbitController(camera, renderer.canvas, {
 });
 scene.add(orbitController);
 
-const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
+const mesh = new Mesh(new CircleGeometry(), new MeshBasicMaterial());
+// const mesh = await new ObjLoader().load("bunny/bunny.obj");
 const cpn = mesh.addComponent(RotateScript);
 scene.add(mesh);
 
 const settings = {
-  color: [255, 0, 0, 128],
+  color: [255, 0, 0, 255],
   stop: false,
   wireframe: true,
 };

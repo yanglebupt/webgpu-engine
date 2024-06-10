@@ -65,6 +65,7 @@ export class ObjLoader {
         indices,
         normals: normals.length > 0 ? normals : undefined,
         uvs: uvs.length > 0 ? uvs : undefined,
+        indexFormat: "uint32",
       }),
       new MeshBasicMaterial()
     );

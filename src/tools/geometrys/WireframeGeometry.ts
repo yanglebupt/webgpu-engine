@@ -103,7 +103,7 @@ export class WireframeGeometry extends Geometry {
       VertexAttributeElementSize.POSITION
     );
     this.indices = new BufferAttribute(
-      new Uint16Array(_indices),
+      new (this.indexFormat === "uint16" ? Uint16Array : Uint32Array)(_indices),
       VertexAttributeElementSize.INDICE
     );
   }

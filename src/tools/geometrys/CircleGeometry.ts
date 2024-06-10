@@ -87,7 +87,7 @@ export class CircleGeometry extends Geometry {
       VertexAttributeElementSize.UV
     );
     this.indices = new BufferAttribute(
-      new Uint16Array(indices),
+      new (this.indexFormat === "uint16" ? Uint16Array : Uint32Array)(indices),
       VertexAttributeElementSize.INDICE
     );
   }

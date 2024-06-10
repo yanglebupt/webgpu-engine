@@ -1,16 +1,14 @@
 import { EntityObject } from "../entitys/EntityObject";
-import { Geometry } from "../geometrys/Geometry";
-import { WireframeGeometry } from "../geometrys/WireframeGeometry";
+import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions, Buildable, Renderable } from "../scene/types";
 import { ShaderLocation } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
+import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
 import { GPUResource } from "../type";
 import { getBlendFromPreset } from "../utils/Blend";
 import { ObservableProxy } from "../utils/Observable";
-
-let _meshId = 0;
 
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
@@ -27,18 +25,17 @@ export class Mesh<
   public geometry: G;
   public material: M;
   public name: string = "Mesh";
-  public description: string = "";
-  public id: number = _meshId++;
 
   private buildOptions!: BuildOptions;
   private renderPipeline!: GPURenderPipeline;
 
   private geometryBuildResult!: {
     vertexCount: number;
-    vertexBuffer: GPUBuffer;
-    bufferLayout: GPUVertexBufferLayout[];
+    vertexBuffer?: GPUBuffer;
+    bufferLayout?: GPUVertexBufferLayout[];
     vertex: GPUShaderModuleCacheKey<any>;
-    bindGroupLayoutEntry: GPUBindGroupLayoutEntry;
+    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
+    resources: GPUResource[];
     indices: {
       buffer: GPUBuffer;
       format: GPUIndexFormat;
@@ -72,6 +69,7 @@ export class Mesh<
     switch (propertyKey) {
       case "wireframe": {
         this.buildGeometry(this.buildOptions.device);
+        this.buildMaterial(this.buildOptions);
         this.buildPipeline(this.buildOptions);
         break;
       }
@@ -85,7 +83,7 @@ export class Mesh<
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     const { bindGroup, bindGroupIndex } = this.materialBuildResult;
     renderPass.setPipeline(this.renderPipeline);
-    renderPass.setVertexBuffer(0, vertexBuffer);
+    if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
     renderPass.setBindGroup(bindGroupIndex, bindGroup);
     if (indices) {
       renderPass.setIndexBuffer(indices.buffer, indices.format);
@@ -104,10 +102,60 @@ export class Mesh<
     this.material.update(device);
   }
 
+  buildWireframe(device: GPUDevice) {
+    const geometry = this.geometry;
+    const { positions, indices } = geometry.attributes;
+    const vertexCount = geometry.getCount("POSITION");
+    const hasIndices = !!indices;
+
+    const resources: GPUResource[] = [];
+    const positionsBuffer = device.createBuffer({
+      size: positions.byteLength,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    });
+    device.queue.writeBuffer(positionsBuffer, 0, positions);
+    resources.push(positionsBuffer);
+    if (hasIndices) {
+      const indicesU32 =
+        geometry.indexFormat === "uint16"
+          ? U16IndicesToU32Indices(indices as Uint16Array)
+          : indices;
+      const indicesBuffer = device.createBuffer({
+        size: indicesU32.byteLength,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+      });
+      device.queue.writeBuffer(indicesBuffer, 0, indicesU32);
+      resources.push(indicesBuffer);
+    }
+
+    this.geometryBuildResult = {
+      vertexCount: (hasIndices ? indices.length : vertexCount) * 2,
+      vertex: { code: wireframe, context: {} },
+      resources,
+      indices: null,
+      bindGroupLayoutEntries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: "read-only-storage" },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: "read-only-storage" },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: "read-only-storage" },
+        },
+      ],
+    };
+  }
+
   buildGeometry(device: GPUDevice) {
-    const geometry = this.material.wireframe
-      ? new WireframeGeometry(this.geometry)
-      : this.geometry;
+    if (this.material.wireframe) return this.buildWireframe(device);
+    const geometry = this.geometry;
     const indexFormat = geometry.indexFormat;
     const { positions, indices, uvs, normals } = geometry.attributes;
     const vertexCount = geometry.getCount("POSITION");
@@ -180,11 +228,14 @@ export class Mesh<
             indexCount: indices.length,
           }
         : null,
-      bindGroupLayoutEntry: {
-        binding: 0,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      } as GPUBindGroupLayoutEntry,
+      bindGroupLayoutEntries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX,
+          buffer: { type: "read-only-storage" },
+        },
+      ],
+      resources: [],
     };
   }
 
@@ -204,7 +255,7 @@ export class Mesh<
   }
 
   buildMaterial(options: BuildOptions) {
-    const { bindGroupLayoutEntry } = this.geometryBuildResult;
+    const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
     const { vertexResources } = this.componentBuildResult;
     const {
       resources: fragmentResources,
@@ -212,10 +263,10 @@ export class Mesh<
       bindGroupLayout,
       bindGroupLayouts,
       bindGroupIndex,
-    } = this.material.build(options, bindGroupLayoutEntry);
+    } = this.material.build(options, bindGroupLayoutEntries);
     const bindGroup = options.device.createBindGroup({
       layout: bindGroupLayout,
-      entries: [...vertexResources, ...fragmentResources].map(
+      entries: [...vertexResources, ...resources, ...fragmentResources].map(
         (resource, binding) => ({
           binding,
           resource:
@@ -256,8 +307,8 @@ export class Mesh<
           depthWriteEnabled: true,
           depthCompare: "less",
         },
-        ...(options.antialias ? { multisample: { count: 4 } } : undefined),
-        bufferLayout,
+        ...(options.antialias ? { multisample: { count: 4 } } : undefined), // 没有则不添加该属性
+        ...(bufferLayout ? { bufferLayout } : undefined),
         ...(blending ? { blending } : undefined),
       },
       bindGroupLayouts

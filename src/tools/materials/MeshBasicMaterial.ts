@@ -22,7 +22,7 @@ export class MeshBasicMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {
     try {
-      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions);
+      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions(1));
     } catch (error) {}
   }
   private uniformValue: StructuredView;
@@ -42,12 +42,13 @@ export class MeshBasicMaterial extends MeshMaterial {
 
   build(
     { device, cached, scene }: BuildOptions,
-    bindGroupLayoutEntry: GPUBindGroupLayoutEntry
+    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[]
   ) {
+    const bindingStart = bindGroupLayoutEntries.length;
     const bindGroupLayout = cached.bindGroupLayout.get([
-      bindGroupLayoutEntry,
+      ...bindGroupLayoutEntries,
       {
-        binding: 1,
+        binding: bindingStart,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       },
@@ -61,7 +62,7 @@ export class MeshBasicMaterial extends MeshMaterial {
       resources: [this.uniform],
       bindGroupLayout: bindGroupLayout,
       bindGroupLayouts: [scene.bindGroupLayout, bindGroupLayout],
-      fragment: { code: fragment, context: {} },
+      fragment: { code: fragment, context: { bindingStart } },
     };
   }
 }

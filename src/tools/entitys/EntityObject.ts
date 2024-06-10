@@ -6,6 +6,8 @@ import {
 import { Transform } from "../components/Transform";
 
 export abstract class EntityObject {
+  abstract name: string;
+  description: string = "";
   transform: Transform;
   private components: Record<string, Component> = {};
   constructor() {

@@ -10,6 +10,7 @@ export class BufferGeometry extends Geometry {
     indices?: number[];
     normals?: number[];
     uvs?: number[];
+    indexFormat?: GPUIndexFormat;
   }) {
     super();
     // build geometry
@@ -29,7 +30,9 @@ export class BufferGeometry extends Geometry {
       );
     if (attributes.indices)
       this.indices = new BufferAttribute(
-        new Uint16Array(attributes.indices),
+        new (this.indexFormat === "uint16" ? Uint16Array : Uint32Array)(
+          attributes.indices
+        ),
         VertexAttributeElementSize.INDICE
       );
   }

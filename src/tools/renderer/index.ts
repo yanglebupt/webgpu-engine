@@ -42,7 +42,7 @@ export class WebGPURenderer {
       alphaMode: GPUCanvasAlphaMode;
     }>
   ) {
-    Object.assign(this, options);
+    Object.assign(this, { backgroundColor: [0, 0, 0, 1], ...options });
   }
 
   private static __collectDeviceFeatures() {
