@@ -649,13 +649,15 @@ export class GLTFScene implements Renderable, Buildable {
                 depthWriteEnabled: true,
                 depthCompare: "less",
               },
-              record: this.record,
             },
             [
               ...bindGroupLayouts,
               this.nodeBindGroupLayout,
               this.materialBindGroupLayout,
-            ]
+            ],
+            {
+              record: this.record,
+            }
           );
           renderPipeline = {
             pipeline,

@@ -28,6 +28,8 @@ export abstract class ObjectStringKeyCache<O extends Object, V, C = any> {
   abstract _default: O | null;
   private cached: Map<Object, V> = new Map<Object, V>();
   constructor(public device: GPUDevice) {}
+  get(key: O): V;
+  get(key: O, create?: (key: O, createOptions?: C) => V, createOptions?: C): V;
   get(key: O, create?: (key: O, createOptions?: C) => V, createOptions?: C): V {
     // 清除 underfined 属性，确保一致性，考虑 JSON.stringify/JSON.parse 的性能问题，可以自己实现一个清除 underfined 属性的类
     clearEmptyPropertyOfObject(key);
@@ -231,7 +233,6 @@ type GPURenderPipelineCacheArgsKey = {
   alphaMode?: BlendMode;
   doubleSided?: boolean;
   bufferLayout?: GPUVertexBufferLayout[];
-  // record?: CreateAndSetRecord;
   blending?: GPUBlendState;
 };
 type GPURenderPipelineCacheKey = {
@@ -274,11 +275,11 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
       vertexModule,
       fragmentModule,
       bindGroupLayouts,
-    }: // record,
-    GPURenderPipelineCreateOptions
+      record,
+    }: GPURenderPipelineCreateOptions
   ): GPURenderPipeline {
     const blend = this.getBlend(args.alphaMode) ?? args.blending;
-    // record && record.pipelineCount++;
+    record && record.pipelineCount++;
     Logger.log("create pipeline");
     return this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts }),
@@ -308,7 +309,10 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
     args: GPURenderPipelineCacheArgsKey,
     // 后面很多情况需要自己手动创建 layout，可以通过 label 来标识唯一但很难使用
     // 还是需要自己来标识唯一
-    bindGroupLayouts: GPUBindGroupLayout[]
+    bindGroupLayouts: GPUBindGroupLayout[],
+    createOptions?: {
+      record?: CreateAndSetRecord;
+    }
   ) {
     // 构建 key
     const { id: vertexId, module: vertexModule } =
@@ -321,8 +325,6 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
       args,
       bindGroupLayouts: bindGroupLayouts.map((b) => b.id),
     };
-    // const record = args.record;
-    // Reflect.deleteProperty(args, "record"); // TODO: 注意删除一些辅助属性
     return super.get(
       key,
       this.create.bind(this) as (
@@ -333,7 +335,7 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
         vertexModule,
         fragmentModule,
         bindGroupLayouts,
-        // record,
+        ...createOptions,
       }
     );
   }
