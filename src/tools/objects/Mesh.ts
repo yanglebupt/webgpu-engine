@@ -1,5 +1,6 @@
 import { EntityObject } from "../entitys/EntityObject";
 import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
+import { WatchAction } from "../materials/Material";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions, Buildable, Renderable } from "../scene/types";
@@ -8,7 +9,7 @@ import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
 import { GPUResource } from "../type";
 import { getBlendFromPreset } from "../utils/Blend";
-import { ObservableProxy } from "../utils/Observable";
+import { ObservableActionParams, ObservableProxy } from "../utils/Observable";
 
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
@@ -65,17 +66,10 @@ export class Mesh<
     ) as M;
   }
 
-  onChange(propertyKey: PropertyKey) {
-    switch (propertyKey) {
-      case "wireframe": {
-        this.buildGeometry(this.buildOptions.device);
-        this.buildMaterial(this.buildOptions);
-        this.buildPipeline(this.buildOptions);
-        break;
-      }
-      default:
-        break;
-    }
+  onChange({ payload }: ObservableActionParams) {
+    (payload as WatchAction[]).forEach((p) => {
+      Reflect.apply(this[p], this, [this.buildOptions]);
+    });
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
@@ -153,7 +147,7 @@ export class Mesh<
     };
   }
 
-  buildGeometry(device: GPUDevice) {
+  buildGeometry({ device }: BuildOptions) {
     if (this.material.wireframe) return this.buildWireframe(device);
     const geometry = this.geometry;
     const indexFormat = geometry.indexFormat;
@@ -239,7 +233,7 @@ export class Mesh<
     };
   }
 
-  buildComponent(device: GPUDevice) {
+  buildComponent({ device }: BuildOptions) {
     const transformUniform = device.createBuffer({
       size: Float32Array.BYTES_PER_ELEMENT * 4 * 4 * 2,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
@@ -307,21 +301,21 @@ export class Mesh<
           depthWriteEnabled: true,
           depthCompare: "less",
         },
-        ...(options.antialias ? { multisample: { count: 4 } } : undefined), // 没有则不添加该属性
-        ...(bufferLayout ? { bufferLayout } : undefined),
-        ...(blending ? { blending } : undefined),
+        // 没有则不添加该属性，undefined 的属性会被 JSON.stringify() 清除，但 null 不会
+        multisample: options.antialias ? { count: 4 } : undefined,
+        bufferLayout,
+        blending,
       },
       bindGroupLayouts
     );
   }
 
   build(options: BuildOptions) {
-    const device = options.device;
     this.buildOptions = options;
     ///////////// 解析 Geometry ////////////////
-    this.buildGeometry(device);
+    this.buildGeometry(options);
     ///////// 解析自己的组件(组件内部也可以有自己的组件) ///////////
-    this.buildComponent(device);
+    this.buildComponent(options);
     /////////////////// 解析 Material /////////////////////////
     this.buildMaterial(options);
     /////////////////// 创建 pipeline //////////////////

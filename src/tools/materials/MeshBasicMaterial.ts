@@ -22,7 +22,7 @@ export class MeshBasicMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {
     try {
-      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions(1));
+      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions());
     } catch (error) {}
   }
   private uniformValue: StructuredView;

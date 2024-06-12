@@ -5,9 +5,11 @@ import {
 } from "../components/Component";
 import { Transform } from "../components/Transform";
 
+let _objectId = 0;
 export abstract class EntityObject {
   abstract name: string;
   description: string = "";
+  id = _objectId++;
   transform: Transform;
   private components: Record<string, Component> = {};
   constructor() {

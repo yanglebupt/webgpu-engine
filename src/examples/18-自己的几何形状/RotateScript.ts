@@ -1,3 +1,4 @@
+import { vec3 } from "wgpu-matrix";
 import { EntityObjectComponent } from "../../tools/components/Component";
 import { Mesh } from "../../tools/objects/Mesh";
 
@@ -13,6 +14,7 @@ export class RotateScript
   stop: boolean = false;
   update(dt: number, t: number) {
     if (this.stop) return;
-    this.transform.rotation[1] = t * this.speed;
+    this.transform.rotateOnAxis(vec3.create(1, 1, 0), dt * this.speed);
+    this.transform.position[0] = Math.sin(t * this.speed);
   }
 }

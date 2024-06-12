@@ -1,13 +1,16 @@
-import { Mat4, mat4 } from "wgpu-matrix";
+import { Mat4, Quat, Vec3, mat4, quat, vec3 } from "wgpu-matrix";
+
+const _v1 = vec3.create();
+const _m1 = mat4.create();
 
 mat4.fromRotationTranslationScale = (
-  q: number[],
-  v: number[],
-  s: number[],
+  q: Quat,
+  v: Vec3,
+  s: Vec3,
   dist?: Mat4
 ) => {
   const out = dist ?? mat4.create();
-  // Quaternion math
+  // Quamrnion math
   let x = q[0],
     y = q[1],
     z = q[2],
@@ -44,4 +47,54 @@ mat4.fromRotationTranslationScale = (
   out[14] = v[2];
   out[15] = 1;
   return out;
+};
+
+mat4.compose = mat4.fromRotationTranslationScale;
+mat4.decompose = (m: Mat4, q: Quat, v: Vec3, s: Vec3) => {
+  const xx = m[0];
+  const xy = m[1];
+  const xz = m[2];
+  const yx = m[4];
+  const yy = m[5];
+  const yz = m[6];
+  const zx = m[8];
+  const zy = m[9];
+  const zz = m[10];
+
+  let sx = Math.sqrt(xx * xx + xy * xy + xz * xz);
+  const sy = Math.sqrt(yx * yx + yy * yy + yz * yz);
+  const sz = Math.sqrt(zx * zx + zy * zy + zz * zz);
+
+  // if demrmine is negative, we need to invert one scale
+  const det = mat4.determinant(m);
+  if (det < 0) sx = -sx;
+
+  v[0] = m[12];
+  v[1] = m[13];
+  v[2] = m[14];
+
+  // scale the rotation part
+  mat4.copy(m, _m1);
+
+  const invSX = 1 / sx;
+  const invSY = 1 / sy;
+  const invSZ = 1 / sz;
+
+  _m1[0] *= invSX;
+  _m1[1] *= invSX;
+  _m1[2] *= invSX;
+
+  _m1[4] *= invSY;
+  _m1[5] *= invSY;
+  _m1[6] *= invSY;
+
+  _m1[8] *= invSZ;
+  _m1[9] *= invSZ;
+  _m1[10] *= invSZ;
+
+  quat.fromMat(_m1, q);
+
+  s[0] = sx;
+  s[1] = sy;
+  s[2] = sz;
 };

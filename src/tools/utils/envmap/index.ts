@@ -197,7 +197,7 @@ export abstract class EnvMap
     // 渲染管线
     const { sampleType, type } = getFilterType(this.polyfill);
     this.renderPipeline = cached.pipeline.get(
-      { code: vertex, context: { flipY: false } },
+      { code: vertex, context: {} },
       { code: fragment, context: { polyfill: this.polyfill } },
       {
         format,

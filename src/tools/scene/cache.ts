@@ -5,22 +5,40 @@ import { Logger } from "../helper";
 import { ShaderContext, ShaderModuleCode } from "../shaders";
 import { v4 as uuidv4 } from "uuid";
 import { CreateAndSetRecord } from "../loaders";
+
+export function clearEmptyPropertyOfObject(obj: any) {
+  Object.keys(obj).forEach((key) => {
+    let value = obj[key];
+    value && typeof value === "object" && clearEmptyPropertyOfObject(value);
+    (value === "" ||
+      value === null ||
+      value === undefined ||
+      value.length === 0 ||
+      (typeof value === "object" && Object.keys(value).length === 0)) &&
+      delete obj[key];
+  });
+  return obj;
+}
+
 /**
  * 使用 lodash.isEqual 来深度比较两个对象是否一样
  */
-export abstract class ObjectStringKeyCache<O extends object, V, C = any> {
+export abstract class ObjectStringKeyCache<O extends Object, V, C = any> {
   abstract create(key: O, createOptions?: C): V;
   abstract _default: O | null;
-  private cached: Map<string, V> = new Map<string, V>();
+  private cached: Map<Object, V> = new Map<Object, V>();
   constructor(public device: GPUDevice) {}
   get(key: O, create?: (key: O, createOptions?: C) => V, createOptions?: C): V {
-    const fk = Iter.filter(this.cached.keys(), (k) =>
-      isEqual(JSON.parse(k), key)
-    );
+    // 清除 underfined 属性，确保一致性，考虑 JSON.stringify/JSON.parse 的性能问题，可以自己实现一个清除 underfined 属性的类
+    clearEmptyPropertyOfObject(key);
+    const fk = Iter.filter(this.cached.keys(), (k) => {
+      clearEmptyPropertyOfObject(k);
+      return isEqual(k, key);
+    });
     if (fk.length == 0) {
       // 新建然后插入，返回
       const value = (create ?? this.create.bind(this))(key, createOptions);
-      this.cached.set(JSON.stringify(key), value);
+      this.cached.set(key, value);
       return value;
     } else if (fk.length == 1) {
       Logger.log("get from cache", Reflect.get(this, "constructor").name);
@@ -32,8 +50,8 @@ export abstract class ObjectStringKeyCache<O extends object, V, C = any> {
   clear() {
     this.cached.clear();
   }
-  delete(key: O): boolean {
-    return this.cached.delete(JSON.stringify(key));
+  delete(key: O) {
+    // return this.cached.delete(JSON.stringify(key)); // TODO
   }
   get default(): V {
     if (!this._default) throw new Error("The default is null, cannot use");
@@ -213,7 +231,7 @@ type GPURenderPipelineCacheArgsKey = {
   alphaMode?: BlendMode;
   doubleSided?: boolean;
   bufferLayout?: GPUVertexBufferLayout[];
-  record?: CreateAndSetRecord;
+  // record?: CreateAndSetRecord;
   blending?: GPUBlendState;
 };
 type GPURenderPipelineCacheKey = {
@@ -256,11 +274,11 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
       vertexModule,
       fragmentModule,
       bindGroupLayouts,
-      record,
-    }: GPURenderPipelineCreateOptions
+    }: // record,
+    GPURenderPipelineCreateOptions
   ): GPURenderPipeline {
     const blend = this.getBlend(args.alphaMode) ?? args.blending;
-    record && record.pipelineCount++;
+    // record && record.pipelineCount++;
     Logger.log("create pipeline");
     return this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts }),
@@ -303,8 +321,8 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
       args,
       bindGroupLayouts: bindGroupLayouts.map((b) => b.id),
     };
-    const record = args.record;
-    Reflect.deleteProperty(args, "record"); // TODO: 注意删除一些辅助属性
+    // const record = args.record;
+    // Reflect.deleteProperty(args, "record"); // TODO: 注意删除一些辅助属性
     return super.get(
       key,
       this.create.bind(this) as (
@@ -315,7 +333,7 @@ export class GPURenderPipelineCache extends ObjectStringKeyCache<
         vertexModule,
         fragmentModule,
         bindGroupLayouts,
-        record,
+        // record,
       }
     );
   }

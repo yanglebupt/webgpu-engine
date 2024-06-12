@@ -37,15 +37,15 @@ const orbitController = new OrbitController(camera, renderer.canvas, {
 });
 scene.add(orbitController);
 
-const mesh = new Mesh(new CircleGeometry(), new MeshBasicMaterial());
+const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
 // const mesh = await new ObjLoader().load("bunny/bunny.obj");
 const cpn = mesh.addComponent(RotateScript);
 scene.add(mesh);
 
 const settings = {
   color: [255, 0, 0, 255],
+  wireframe: false,
   stop: false,
-  wireframe: true,
 };
 const gui = new GUI();
 gui

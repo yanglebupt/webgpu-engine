@@ -62,3 +62,7 @@ export function bilinearFilter(
 export function mod(x: number, a: number) {
   return x - a * Math.floor(x / a);
 }
+
+export function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}

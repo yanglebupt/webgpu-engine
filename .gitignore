@@ -15,6 +15,7 @@ dist-ssr
 pbr-shader
 geometry
 webgpu_wireframe_thicklines-master
+math-docs
 
 # Editor directories and files
 .vscode/*

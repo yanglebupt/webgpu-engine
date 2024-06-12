@@ -1,13 +1,15 @@
 /**
  * 监听对象属性的改变
  */
-export type ObservableAction = (
-  propertyKey: PropertyKey,
-  newValue?: any,
-  oldValue?: any
-) => void;
+export type ObservableActionParams = {
+  propertyKey: PropertyKey;
+  newValue: any;
+  oldValue: any;
+  payload: any;
+};
+export type ObservableAction = (p: ObservableActionParams) => void;
 export interface Observable {
-  watch: PropertyKey[];
+  watch: PropertyKey[] | { [key: PropertyKey]: any };
   onChange?: ObservableAction;
 }
 
@@ -32,9 +34,26 @@ export class ObservableProxy<T extends Observable> extends Proxy<T> {
         const oldValue = Reflect.get(target, p, receiver);
         // @ts-ignore
         const flag = Reflect.set(...arguments);
-        if (object.watch.includes(p) && oldValue !== newValue) {
-          object.onChange && object.onChange(p, newValue, oldValue);
-          action && action(p, newValue, oldValue);
+        const watchDescriptor = object.watch;
+        let changed = false;
+        let payload;
+        if (oldValue !== newValue) {
+          if (Array.isArray(watchDescriptor)) {
+            changed = watchDescriptor.includes(p);
+          } else {
+            changed = Object.hasOwn(watchDescriptor, p);
+            payload = watchDescriptor[p];
+          }
+        }
+        if (changed) {
+          const params = {
+            propertyKey: p,
+            newValue,
+            oldValue,
+            payload,
+          };
+          object.onChange && object.onChange(params);
+          action && action(params);
         }
         return flag;
       },
