@@ -21,7 +21,7 @@ export class MeshBasicMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {
     try {
-      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions);
+      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions());
     } catch (error) {}
   }
   private uniformValue: StructuredView;
@@ -39,10 +39,10 @@ export class MeshBasicMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build(device: GPUDevice) {
+  build(device: GPUDevice, bindingStart: number = 0) {
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: 0,
+        binding: bindingStart,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       },
@@ -54,7 +54,7 @@ export class MeshBasicMaterial extends MeshMaterial {
     return {
       resources: [this.uniform],
       bindGroupLayoutEntries,
-      fragment: { code: fragment, context: {} },
+      fragment: { code: fragment, context: { bindingStart } },
     };
   }
 }

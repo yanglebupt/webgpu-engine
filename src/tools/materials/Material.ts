@@ -16,7 +16,10 @@ export interface WatchPropertyKey {
 export abstract class Material implements Observable {
   abstract watch: WatchPropertyKey;
   abstract update(device: GPUDevice): void;
-  abstract build(device: GPUDevice): {
+  abstract build(
+    device: GPUDevice,
+    bindingStart?: number
+  ): {
     bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
     resources: GPUResource[];
     fragment: GPUShaderModuleCacheKey<any>;
