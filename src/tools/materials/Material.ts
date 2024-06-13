@@ -1,4 +1,5 @@
 import { GPUShaderModuleCacheKey } from "../scene/cache";
+import { BuildOptions } from "../scene/types";
 import { GPUResource } from "../type";
 import { Observable } from "../utils/Observable";
 
@@ -17,7 +18,7 @@ export abstract class Material implements Observable {
   abstract watch: WatchPropertyKey;
   abstract update(device: GPUDevice): void;
   abstract build(
-    device: GPUDevice,
+    options: BuildOptions,
     bindingStart?: number
   ): {
     bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];

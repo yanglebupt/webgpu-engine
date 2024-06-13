@@ -300,7 +300,7 @@ export class Mesh<
         resources,
         fragment: _fragment,
         bindGroupLayoutEntries,
-      } = this.material.build(device);
+      } = this.material.build(options);
       const bindGroupLayout = cached.bindGroupLayout.get(
         bindGroupLayoutEntries
       );

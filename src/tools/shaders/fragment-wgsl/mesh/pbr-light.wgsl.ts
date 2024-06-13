@@ -81,8 +81,8 @@ fn cotangentFrame(N: vec3f, p: vec3f, uv: vec2f) -> mat3x3f
     return mat3x3f( T * invmax, B * invmax, N );
 }
 
-fn applyNormalMap(localNorm: vec3f, uv0: vec2f, normal: vec3f, p: vec3f) -> vec3f {
-  let n = normalize(2.0 * localNorm - 1.0);
+fn applyNormalMap(localNorm: vec3f, normalScale: f32, uv0: vec2f, normal: vec3f, p: vec3f) -> vec3f {
+  let n = normalize((2.0 * localNorm - 1.0)*vec3f(normalScale,normalScale,1.0));
   let tbn = cotangentFrame(normal, -p, uv0);
   return normalize(tbn * n);
 }
@@ -152,6 +152,14 @@ fn irradiance_point_light(in_light: InputLight, pos: vec3f, n: vec3f) -> Light {
   return light;
 }
 
+fn irradiance_ambient_light(in_light: InputLight, n: vec3f) -> Light {
+  var light: Light;
+  light.dir = n;
+  light.ir = in_light.flux*rgb2lin(in_light.color.rgb); 
+  return light;
+}
+
+
 // fn irradiance_spot_light(in_light: InputLight, pos: vec3f, n: vec3f) -> Light {
 //   var light: Light;
 //   let lightDir = in_light.pos - pos;
@@ -214,7 +222,7 @@ fn main(
   
   let v = normalize(cameraPos-pos);
   let n = select(normalize(norm), 
-                applyNormalMap(textureSample(normalTexture, materialSampler, uv0).xyz, uv0, normalize(norm), v),
+                applyNormalMap(textureSample(normalTexture, materialSampler, uv0).xyz, ${M_U_NAME}.normalScale, uv0, normalize(norm), v),
                 bool(${M_U_NAME}.applyNormalMap));
 
   var radiance = emissiveColor + 
@@ -232,6 +240,10 @@ fn main(
         out_light = irradiance_point_light(in_light, pos, n); 
         break; 
       }
+      case 4: {
+        out_light = irradiance_ambient_light(in_light, n);
+        break; 
+      }
       default: {
         break; 
       }
@@ -245,9 +257,7 @@ fn main(
   let rgb = lin2rgb(radiance);
 
   #if ${context.useAlphaCutoff}
-    if(baseColor.a < ${M_U_NAME}.alphaCutoff){
-      discard;
-    }
+    if(baseColor.a < ${M_U_NAME}.alphaCutoff){discard;}
   #endif
   return vec4f(rgb, baseColor.a);
 }

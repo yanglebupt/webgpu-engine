@@ -1151,11 +1151,13 @@ export class GLTFBufferView {
       throw new Error("Can't upload texture without create bitmap");
     const size = [this.bitmap.width, this.bitmap.height];
     this.texture?.destroy();
+    // TODO: srgb not support STORAGE_BINDING
     this.texture = createTextureFromSource(mipmap.device, this.bitmap, {
+      format: this.format,
       mips: false,
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.STORAGE_BINDING |
+        // GPUTextureUsage.STORAGE_BINDING |
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.COPY_SRC,
       mipLevelCount: mips ? maxMipLevelCount(...size) : 1,
@@ -1316,8 +1318,7 @@ export class GLTFMaterial {
   }
 
   uploadSolidColorTexture(cached: SolidColorTextureCache) {
-    // 值
-    const preferredFormat = StaticTextureUtil.renderFormat.split("-")[0];
+    const preferredFormat = StaticTextureUtil.textureFormat.split("-")[0];
     // 贴图和采样器
     this.textures = (
       [

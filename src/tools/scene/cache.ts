@@ -98,7 +98,7 @@ export class SolidColorTextureCache extends ObjectStringKeyCache<
   GPUTexture
 > {
   _default: SolidColorTextureCacheKey = {
-    format: StaticTextureUtil.renderFormat.split("-")[0] as GPUTextureFormat,
+    format: StaticTextureUtil.textureFormat.split("-")[0] as GPUTextureFormat,
     type: "transparentBlackTexture",
   };
   create({ format, type }: SolidColorTextureCacheKey): GPUTexture {

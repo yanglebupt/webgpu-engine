@@ -9,6 +9,7 @@ import {
   makeStructuredView,
 } from "webgpu-utils";
 import { MeshMaterial } from "./MeshMaterial";
+import { BuildOptions } from "../scene/types";
 
 export interface MeshBasicMaterial {
   color: Vec4;
@@ -39,7 +40,7 @@ export class MeshBasicMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build(device: GPUDevice, bindingStart: number = 0) {
+  build({ device }: BuildOptions, bindingStart: number = 0) {
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
         binding: bindingStart,

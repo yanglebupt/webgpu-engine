@@ -13,6 +13,7 @@ export enum LightType {
   DIRECTION = 1,
   POINT = 2,
   SPOT = 3,
+  AMBIENT = 4,
 }
 
 export interface Light {
@@ -54,6 +55,13 @@ export class Light implements VirtualView {
       flux: this.flux,
       ltype: this.type,
     };
+  }
+}
+
+export class AmbientLight extends Light {
+  public type = LightType.AMBIENT;
+  constructor(public color: Vec4, public flux: number) {
+    super();
   }
 }
 

@@ -16,6 +16,9 @@ import "./index.css";
 import { Clock } from "../../tools/utils/Clock";
 import { RotateScript, RotateScriptOptions } from "./RotateScript";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
+import { MeshPhysicalMaterial } from "../../tools/materials/MeshPhysicalMaterial";
+import { Texture } from "../../tools/textures/Texture";
+import { AmbientLight, DirectionLight } from "../../tools/lights";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer()
@@ -31,14 +34,38 @@ const scene = new Scene(renderer);
 
 // 创建相机和控制器
 const camera = new PerspectiveCamera(degToRad(75), renderer.aspect, 0.1, 100);
-camera.lookAt([0, 1, -2], [0, 0, 0]);
+camera.lookAt([0, 1, -5], [0, 0, 0]);
 const orbitController = new OrbitController(camera, renderer.canvas, {
   zoomSpeed: 0.5,
 });
 scene.add(orbitController);
 
-const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
-// const mesh = await new ObjLoader().load("bunny/bunny.obj");
+const amb_light = new AmbientLight([1, 1, 1, 1], 10);
+scene.add(amb_light);
+
+const baseColorTexture = await new Texture(
+  "/standalone/image_imageStoneDemonAlbedo1024.png"
+).load();
+const normalTexture = await new Texture(
+  "/standalone/image_imageStoneDemonNormal1024.png"
+).load();
+const metallicRoughnessTexture = await new Texture(
+  "/standalone/image_MergedTexturesmetallicRoughness.png"
+).load();
+const emissiveTexture = await new Texture(
+  "/standalone/image_imageStoneDemonEmissionColor1024.png"
+).load();
+// const mesh = new Mesh(
+//   new CubeGeometry(),
+//   new MeshPhysicalMaterial({
+//     baseColorTexture,
+//     normalTexture,
+//     metallicRoughnessTexture,
+//     emissiveTexture,
+//   })
+// );
+// const mesh = await new ObjLoader().load("standalone/mesh_StoneDeamon.obj");
+const mesh = await new ObjLoader().load("bunny/bunny-export.obj");
 const cpn = mesh.addComponent(RotateScript);
 scene.add(mesh);
 
@@ -46,14 +73,16 @@ const settings = {
   color: [255, 0, 0, 255],
   wireframe: false,
   stop: false,
+  metallicFactor: 1,
+  roughnessFactor: 1,
 };
 const gui = new GUI();
-gui
-  .addColor(settings, "color")
-  .onChange(
-    (color: number[]) => (mesh.material.color = color.map((v) => v / 255))
-  );
+gui.addColor(settings, "color");
 gui.add(settings, "wireframe");
+gui.add(settings, "metallicFactor", 0, 1, 0.1);
+// .onChange((m) => (mesh.material.metallicFactor = m));
+gui.add(settings, "roughnessFactor", 0, 1, 0.1);
+// .onChange((r) => (mesh.material.roughnessFactor = r));
 gui.add(settings, "stop").onChange((s) => (cpn.stop = s));
 
 export function frame() {

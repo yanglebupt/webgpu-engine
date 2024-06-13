@@ -1,5 +1,6 @@
 export class StaticTextureUtil {
   static renderFormat: GPUTextureFormat = "rgba8unorm";
+  static textureFormat: GPUTextureFormat = "rgba8unorm";
   static depthFormat: GPUTextureFormat = "depth24plus";
   static depthTexture: GPUTexture;
   static multiSampleTexture: GPUTexture;

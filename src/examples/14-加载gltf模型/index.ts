@@ -101,7 +101,7 @@ const settings = {
   model_name: "stone_demon",
   flux: 10.0,
   posLightY: 2.2,
-  mips: true,
+  mips: false,
   hasEnvMap: true,
   useEnvMap: true,
 };
