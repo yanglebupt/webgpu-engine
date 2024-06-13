@@ -11,6 +11,24 @@ import { GPUResource } from "../type";
 import { getBlendFromPreset } from "../utils/Blend";
 import { ObservableActionParams, ObservableProxy } from "../utils/Observable";
 
+export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
+  const entries: GPUBindGroupEntry[] = [];
+  let binding = 0;
+  for (let i = 0; i < resourcesList.length; i++) {
+    const resources = resourcesList[i];
+    for (let j = 0; j < resources.length; j++) {
+      const resource = resources[j];
+      entries.push({
+        binding,
+        resource:
+          resource instanceof GPUBuffer ? { buffer: resource } : resource,
+      });
+      binding++;
+    }
+  }
+  return entries;
+}
+
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
  */
@@ -45,8 +63,7 @@ export class Mesh<
   };
 
   private materialBuildResult!: {
-    bindGroupIndex: number;
-    bindGroup: GPUBindGroup;
+    bindGroups: GPUBindGroup[];
     bindGroupLayouts: GPUBindGroupLayout[];
     fragment: GPUShaderModuleCacheKey<any>;
   };
@@ -68,17 +85,25 @@ export class Mesh<
 
   onChange({ payload }: ObservableActionParams) {
     (payload as WatchAction[]).forEach((p) => {
-      Reflect.apply(this[p], this, [this.buildOptions]);
+      Reflect.apply(this[p], this, this.getArgumentsList(p));
     });
+  }
+
+  getArgumentsList(p: WatchAction) {
+    return p === WatchAction.Pipeline || p === WatchAction.Material
+      ? [this.buildOptions]
+      : [this.buildOptions.device];
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
     this.updateBuffers(device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
-    const { bindGroup, bindGroupIndex } = this.materialBuildResult;
+    const { bindGroups } = this.materialBuildResult;
     renderPass.setPipeline(this.renderPipeline);
     if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
-    renderPass.setBindGroup(bindGroupIndex, bindGroup);
+    bindGroups.forEach((group, index) => {
+      renderPass.setBindGroup(index + 1, group);
+    });
     if (indices) {
       renderPass.setIndexBuffer(indices.buffer, indices.format);
       renderPass.drawIndexed(indices.indexCount);
@@ -147,7 +172,7 @@ export class Mesh<
     };
   }
 
-  buildGeometry({ device }: BuildOptions) {
+  buildGeometry(device: GPUDevice) {
     if (this.material.wireframe) return this.buildWireframe(device);
     const geometry = this.geometry;
     const indexFormat = geometry.indexFormat;
@@ -233,7 +258,7 @@ export class Mesh<
     };
   }
 
-  buildComponent({ device }: BuildOptions) {
+  buildComponent(device: GPUDevice) {
     const transformUniform = device.createBuffer({
       size: Float32Array.BYTES_PER_ELEMENT * 4 * 4 * 2,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
@@ -249,31 +274,47 @@ export class Mesh<
   }
 
   buildMaterial(options: BuildOptions) {
-    const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
-    const { vertexResources } = this.componentBuildResult;
-    const {
-      resources: fragmentResources,
-      fragment,
-      bindGroupLayout,
-      bindGroupLayouts,
-      bindGroupIndex,
-    } = this.material.build(options, bindGroupLayoutEntries);
-    const bindGroup = options.device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [...vertexResources, ...resources, ...fragmentResources].map(
-        (resource, binding) => ({
-          binding,
-          resource:
-            resource instanceof GPUBuffer ? { buffer: resource } : resource,
-        })
-      ),
-    });
+    const { device, cached, scene } = options;
+    const bindGroups: GPUBindGroup[] = [];
+    const bindGroupLayouts: GPUBindGroupLayout[] = [];
+    let fragment;
+
+    {
+      const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
+      const { vertexResources } = this.componentBuildResult;
+      const bindGroupLayout = cached.bindGroupLayout.get(
+        bindGroupLayoutEntries
+      );
+      const bindGroup = device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: getBindGroupEntries(vertexResources, resources),
+      });
+      bindGroups.push(bindGroup);
+      bindGroupLayouts.push(bindGroupLayout);
+    }
+
+    {
+      const {
+        resources,
+        fragment: _fragment,
+        bindGroupLayoutEntries,
+      } = this.material.build(device);
+      const bindGroupLayout = cached.bindGroupLayout.get(
+        bindGroupLayoutEntries
+      );
+      const bindGroup = options.device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: getBindGroupEntries(resources),
+      });
+      bindGroups.push(bindGroup);
+      bindGroupLayouts.push(bindGroupLayout);
+      fragment = _fragment;
+    }
 
     this.materialBuildResult = {
-      bindGroupIndex,
-      bindGroup,
       fragment,
-      bindGroupLayouts,
+      bindGroups,
+      bindGroupLayouts: [scene.bindGroupLayout, ...bindGroupLayouts],
     };
   }
 
@@ -312,10 +353,11 @@ export class Mesh<
 
   build(options: BuildOptions) {
     this.buildOptions = options;
+    const device = options.device;
     ///////////// 解析 Geometry ////////////////
-    this.buildGeometry(options);
+    this.buildGeometry(device);
     ///////// 解析自己的组件(组件内部也可以有自己的组件) ///////////
-    this.buildComponent(options);
+    this.buildComponent(device);
     /////////////////// 解析 Material /////////////////////////
     this.buildMaterial(options);
     /////////////////// 创建 pipeline //////////////////

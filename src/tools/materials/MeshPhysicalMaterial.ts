@@ -15,9 +15,6 @@ export interface MeshPhysicalMaterial {
   color: Vec4;
 }
 
-/**
- * TODO: 对于 MeshBasicMaterial，可以在 shader 中补充更多内容
- */
 export class MeshPhysicalMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {

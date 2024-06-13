@@ -1,5 +1,4 @@
 import { GPUShaderModuleCacheKey } from "../scene/cache";
-import { BuildOptions, Buildable, Updatable } from "../scene/types";
 import { GPUResource } from "../type";
 import { Observable } from "../utils/Observable";
 
@@ -14,16 +13,11 @@ export interface WatchPropertyKey {
   [key: PropertyKey]: WatchAction[];
 }
 
-export abstract class Material implements Buildable, Updatable, Observable {
+export abstract class Material implements Observable {
   abstract watch: WatchPropertyKey;
   abstract update(device: GPUDevice): void;
-  abstract build(
-    options: BuildOptions,
-    bindGroupLayoutEntries?: GPUBindGroupLayoutEntry[]
-  ): {
-    bindGroupIndex: number;
-    bindGroupLayout: GPUBindGroupLayout;
-    bindGroupLayouts: GPUBindGroupLayout[];
+  abstract build(device: GPUDevice): {
+    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
     resources: GPUResource[];
     fragment: GPUShaderModuleCacheKey<any>;
   };

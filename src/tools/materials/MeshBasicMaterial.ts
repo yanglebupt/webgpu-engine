@@ -1,5 +1,4 @@
 import { Vec4 } from "wgpu-matrix";
-import { BuildOptions } from "../scene/types";
 import fragment, {
   DataDefinitions,
 } from "../shaders/fragment-wgsl/mesh/basic.wgsl";
@@ -22,7 +21,7 @@ export class MeshBasicMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {
     try {
-      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions());
+      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions);
     } catch (error) {}
   }
   private uniformValue: StructuredView;
@@ -40,29 +39,22 @@ export class MeshBasicMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build(
-    { device, cached, scene }: BuildOptions,
-    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[]
-  ) {
-    const bindingStart = bindGroupLayoutEntries.length;
-    const bindGroupLayout = cached.bindGroupLayout.get([
-      ...bindGroupLayoutEntries,
+  build(device: GPUDevice) {
+    const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: bindingStart,
+        binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       },
-    ]);
+    ];
     this.uniform = device.createBuffer({
       size: this.uniformValue.arrayBuffer.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     return {
-      bindGroupIndex: 1,
       resources: [this.uniform],
-      bindGroupLayout: bindGroupLayout,
-      bindGroupLayouts: [scene.bindGroupLayout, bindGroupLayout],
-      fragment: { code: fragment, context: { bindingStart } },
+      bindGroupLayoutEntries,
+      fragment: { code: fragment, context: {} },
     };
   }
 }

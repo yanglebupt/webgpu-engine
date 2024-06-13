@@ -558,7 +558,7 @@ export class GLTFScene implements Renderable, Buildable {
       {
         binding: 6,
         visibility: GPUShaderStage.FRAGMENT,
-        sampler: {},
+        sampler: { type: "filtering" },
       },
     ]);
 
