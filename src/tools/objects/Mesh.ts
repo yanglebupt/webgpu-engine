@@ -278,30 +278,40 @@ export class Mesh<
     const bindGroups: GPUBindGroup[] = [];
     const bindGroupLayouts: GPUBindGroupLayout[] = [];
 
-    const { bindGroupLayoutEntries: vertexBindGroupLayoutEntries, resources } =
-      this.geometryBuildResult;
-    const { vertexResources } = this.componentBuildResult;
-    const {
-      resources: fragmentResources,
-      fragment,
-      bindGroupLayoutEntries,
-    } = this.material.build(device, vertexBindGroupLayoutEntries.length);
+    /////////////////////// 拆分成两个 bindGroup //////////////////////
+    let fragment;
 
-    ///////////////////// 拼接成一个 bindGroup ///////////////////////
-    const bindGroupLayout = cached.bindGroupLayout.get([
-      ...vertexBindGroupLayoutEntries,
-      ...bindGroupLayoutEntries,
-    ]);
-    const bindGroup = device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: getBindGroupEntries(
-        vertexResources,
+    {
+      const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
+      const { vertexResources } = this.componentBuildResult;
+      const bindGroupLayout = cached.bindGroupLayout.get(
+        bindGroupLayoutEntries
+      );
+      const bindGroup = device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: getBindGroupEntries(vertexResources, resources),
+      });
+      bindGroups.push(bindGroup);
+      bindGroupLayouts.push(bindGroupLayout);
+    }
+
+    {
+      const {
         resources,
-        fragmentResources
-      ),
-    });
-    bindGroups.push(bindGroup);
-    bindGroupLayouts.push(bindGroupLayout);
+        fragment: _fragment,
+        bindGroupLayoutEntries,
+      } = this.material.build(device);
+      const bindGroupLayout = cached.bindGroupLayout.get(
+        bindGroupLayoutEntries
+      );
+      const bindGroup = options.device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: getBindGroupEntries(resources),
+      });
+      bindGroups.push(bindGroup);
+      bindGroupLayouts.push(bindGroupLayout);
+      fragment = _fragment;
+    }
 
     this.materialBuildResult = {
       fragment,

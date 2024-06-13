@@ -1,21 +1,14 @@
-import { ShaderContext } from "../..";
-interface ShaderContextParameter {
-  bindingStart: number;
-}
-export const DataDefinitions = (bindingStart: number = 1) => /* wgsl */ `
+export const DataDefinitions = /* wgsl */ `
 struct Uniforms {
   color: vec4f,
 } 
-@group(1) @binding(${bindingStart}) var<uniform> uni: Uniforms;
+@group(2) @binding(0) var<uniform> uni: Uniforms;
 `;
 
-export default (context: ShaderContext<ShaderContextParameter>) => {
-  const { bindingStart = 1 } = context;
-  return /* wgsl */ `
-${DataDefinitions(bindingStart)}
+export default () => /* wgsl */ `
+${DataDefinitions}
 @fragment
 fn main() -> @location(0) vec4f {
   return uni.color;
 }
 `;
-};
