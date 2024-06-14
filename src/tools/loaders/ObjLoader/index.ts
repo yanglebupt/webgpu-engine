@@ -5,12 +5,12 @@ import { Mesh } from "../../objects/Mesh";
 export class ObjLoader {
   async load(filename: string) {
     const content = await (await fetch(filename)).text();
-    const lines = content.split("\n");
+    let lines = content.split("\n");
     ///////////////////////////////
-    const vertexCache: number[][] = [];
-    const uvCache: number[][] = [];
-    const normCache: number[][] = [];
-    const faceCache: string[][] = [];
+    let vertexCache: number[][] = [];
+    let uvCache: number[][] = [];
+    let normCache: number[][] = [];
+    let faceCache: string[][] = [];
     ///////////////////////////////
     let name = filename.split("/").at(-1) ?? "";
     const comments: string[] = [];
@@ -34,16 +34,25 @@ export class ObjLoader {
     const normals: number[] = [];
     const indices: number[] = [];
     //////////////////////////////
-    const remapping: Record<string, number> = {};
+    let remapping: Record<string, number> = {};
     let i = 0;
     for (const face of faceCache) {
-      for (const faceVertex of face) {
+      // 有可能是四角面或者三角面
+      const preIndices: number[] = [];
+      for (let index = 0, len = face.length; index < len; index++) {
+        const faceVertex = face[index];
+        if (index === 3) {
+          indices.push(preIndices[0], preIndices[2]);
+        }
         if (remapping[faceVertex] !== undefined) {
-          indices.push(remapping[faceVertex]);
+          const i = remapping[faceVertex];
+          indices.push(i);
+          preIndices.push(i);
           continue;
         }
         remapping[faceVertex] = i;
         indices.push(i);
+        preIndices.push(i);
         const [vertexIndex, uvIndex, normIndex] = faceVertex
           .split("/")
           .map((s) => Number(s) - 1);
@@ -59,13 +68,28 @@ export class ObjLoader {
         i++;
       }
     }
+    {
+      //@ts-ignore
+      remapping = null;
+      //@ts-ignore
+      vertexCache = null;
+      //@ts-ignore
+      uvCache = null;
+      //@ts-ignore
+      normCache = null;
+      //@ts-ignore
+      faceCache = null;
+      //@ts-ignore
+      lines = null;
+    }
+    console.log(vertices.length, indices.length);
     const mesh = new Mesh(
       new BufferGeometry({
         vertices,
         indices,
         normals: normals.length > 0 ? normals : undefined,
         uvs: uvs.length > 0 ? uvs : undefined,
-        indexFormat: "uint32",
+        indexFormat: "uint32", //  这里一定要用 uint32，一些大模型肯定会超过 uint16
       }),
       new MeshBasicMaterial()
     );

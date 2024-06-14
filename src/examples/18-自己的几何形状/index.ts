@@ -50,29 +50,28 @@ const normalTexture = await new Texture(
   "/standalone/image_imageStoneDemonNormal1024.png"
 ).load();
 const metallicRoughnessTexture = await new Texture(
-  "/standalone/image_MergedTexturesmetallicRoughness.png"
+  "/standalone/image_MergedTexturesmetallicRoughness.png",
+  { flipY: false }
 ).load();
 const emissiveTexture = await new Texture(
   "/standalone/image_imageStoneDemonEmissionColor1024.png"
 ).load();
-// const mesh = new Mesh(
-//   new CubeGeometry(),
-//   new MeshPhysicalMaterial({
-//     baseColorTexture,
-//     normalTexture,
-//     metallicRoughnessTexture,
-//     emissiveTexture,
-//   })
-// );
-// const mesh = await new ObjLoader().load("standalone/mesh_StoneDeamon.obj");
-const mesh = await new ObjLoader().load("bunny/bunny-export.obj");
+const mesh = new Mesh(
+  new CubeGeometry(),
+  new MeshPhysicalMaterial({
+    baseColorTexture,
+    normalTexture,
+    metallicRoughnessTexture,
+    emissiveTexture,
+  })
+);
 const cpn = mesh.addComponent(RotateScript);
 scene.add(mesh);
 
 const settings = {
   color: [255, 0, 0, 255],
   wireframe: false,
-  stop: false,
+  stop: true,
   metallicFactor: 1,
   roughnessFactor: 1,
 };

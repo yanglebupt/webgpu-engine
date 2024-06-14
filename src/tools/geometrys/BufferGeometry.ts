@@ -13,6 +13,7 @@ export class BufferGeometry extends Geometry {
     indexFormat?: GPUIndexFormat;
   }) {
     super();
+    this.indexFormat = attributes.indexFormat;
     // build geometry
     this.positions = new BufferAttribute(
       new Float32Array(attributes.vertices),

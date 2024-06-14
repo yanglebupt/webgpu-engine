@@ -5,6 +5,7 @@ import { GPUSamplerCache } from "../scene/cache";
 export interface Texture {
   format: GPUTextureFormat;
   mips: boolean;
+  flipY: boolean;
 }
 
 export class Texture {
@@ -15,11 +16,11 @@ export class Texture {
 
   constructor(
     filename: string,
-    public samplerDescriptor?: GPUSamplerDescriptor,
-    options?: { format?: GPUTextureFormat; mips?: boolean }
+    options?: { format?: GPUTextureFormat; mips?: boolean; flipY?: boolean },
+    public samplerDescriptor?: GPUSamplerDescriptor
   ) {
     this.filename = filename;
-    Object.assign(this, options);
+    Object.assign(this, { flipY: true, ...options });
   }
 
   async load() {
@@ -38,6 +39,7 @@ export class Texture {
       ? cached.get(this.samplerDescriptor)
       : cached.default;
     this.texture = createTextureFromSource(device, this.source, {
+      flipY: this.flipY,
       format: format ?? this.format,
       mips: false,
       usage:

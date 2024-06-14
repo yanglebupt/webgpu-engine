@@ -11,7 +11,7 @@ export class RotateScript
   implements RotateScriptOptions
 {
   speed: number = 1;
-  stop: boolean = false;
+  stop: boolean = true;
   update(dt: number, t: number) {
     if (this.stop) return;
     this.transform.rotateOnAxis(vec3.create(1, 1, 0), dt * this.speed);
