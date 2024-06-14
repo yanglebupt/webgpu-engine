@@ -82,7 +82,6 @@ export class ObjLoader {
       //@ts-ignore
       lines = null;
     }
-    console.log(vertices.length, indices.length);
     const mesh = new Mesh(
       new BufferGeometry({
         vertices,

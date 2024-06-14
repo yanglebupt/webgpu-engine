@@ -42,7 +42,7 @@ export class Mesh<
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   public geometry: G;
-  public material: M;
+  public _material: M;
   public name: string = "Mesh";
 
   private buildOptions!: BuildOptions;
@@ -77,7 +77,18 @@ export class Mesh<
   constructor(geometry: G, material: M) {
     super();
     this.geometry = geometry;
-    this.material = new ObservableProxy(
+    this._material = new ObservableProxy(
+      material,
+      this.onChange.bind(this)
+    ) as M;
+  }
+
+  get material() {
+    return this._material;
+  }
+
+  set material(material: MeshMaterial) {
+    this._material = new ObservableProxy(
       material,
       this.onChange.bind(this)
     ) as M;
@@ -123,52 +134,86 @@ export class Mesh<
 
   buildWireframe(device: GPUDevice) {
     const geometry = this.geometry;
-    const { positions, indices } = geometry.attributes;
+    const { positions, indices, normals, uvs } = geometry.attributes;
     const vertexCount = geometry.getCount("POSITION");
     const hasIndices = !!indices;
+    const useNormal = !!normals;
+    const useTexcoord = !!uvs;
+
+    const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      },
+    ];
 
     const resources: GPUResource[] = [];
+
     const positionsBuffer = device.createBuffer({
       size: positions.byteLength,
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     });
     device.queue.writeBuffer(positionsBuffer, 0, positions);
     resources.push(positionsBuffer);
+
     if (hasIndices) {
       const indicesU32 =
         geometry.indexFormat === "uint16"
           ? U16IndicesToU32Indices(indices as Uint16Array)
           : indices;
-      const indicesBuffer = device.createBuffer({
+      const buffer = device.createBuffer({
         size: indicesU32.byteLength,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
       });
-      device.queue.writeBuffer(indicesBuffer, 0, indicesU32);
-      resources.push(indicesBuffer);
+      device.queue.writeBuffer(buffer, 0, indicesU32);
+      resources.push(buffer);
+      bindGroupLayoutEntries.push({
+        binding: 2,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      });
+    }
+
+    if (useNormal) {
+      const buffer = device.createBuffer({
+        size: normals.byteLength,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+      });
+      device.queue.writeBuffer(buffer, 0, normals);
+      resources.push(buffer);
+      bindGroupLayoutEntries.push({
+        binding: 3,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      });
+    }
+
+    if (useTexcoord) {
+      const buffer = device.createBuffer({
+        size: uvs.byteLength,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+      });
+      device.queue.writeBuffer(buffer, 0, uvs);
+      resources.push(buffer);
+      bindGroupLayoutEntries.push({
+        binding: 4,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      });
     }
 
     this.geometryBuildResult = {
       vertexCount: (hasIndices ? indices.length : vertexCount) * 2,
-      vertex: { code: wireframe, context: {} },
+      vertex: { code: wireframe, context: { useNormal, useTexcoord } },
       resources,
       indices: null,
-      bindGroupLayoutEntries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: "read-only-storage" },
-        },
-      ],
+      bindGroupLayoutEntries: bindGroupLayoutEntries,
     };
   }
 

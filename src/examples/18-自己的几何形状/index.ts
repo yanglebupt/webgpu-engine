@@ -56,17 +56,18 @@ const metallicRoughnessTexture = await new Texture(
 const emissiveTexture = await new Texture(
   "/standalone/image_imageStoneDemonEmissionColor1024.png"
 ).load();
-const mesh = new Mesh(
-  new CubeGeometry(),
-  new MeshPhysicalMaterial({
-    baseColorTexture,
-    normalTexture,
-    metallicRoughnessTexture,
-    emissiveTexture,
-  })
-);
-const cpn = mesh.addComponent(RotateScript);
+const model = await new ObjLoader().load("/standalone/mesh_StoneDeamon.obj");
+model.material = new MeshPhysicalMaterial({
+  baseColorTexture,
+  normalTexture,
+  metallicRoughnessTexture,
+  emissiveTexture,
+});
+const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
+const cpn_1 = mesh.addComponent(RotateScript);
+const cpn_2 = model.addComponent(RotateScript);
 scene.add(mesh);
+scene.add(model);
 
 const settings = {
   color: [255, 0, 0, 255],
@@ -76,16 +77,32 @@ const settings = {
   roughnessFactor: 1,
 };
 const gui = new GUI();
-gui.addColor(settings, "color");
-gui.add(settings, "wireframe");
-gui.add(settings, "metallicFactor", 0, 1, 0.1);
-// .onChange((m) => (mesh.material.metallicFactor = m));
-gui.add(settings, "roughnessFactor", 0, 1, 0.1);
-// .onChange((r) => (mesh.material.roughnessFactor = r));
-gui.add(settings, "stop").onChange((s) => (cpn.stop = s));
+gui
+  .addColor(settings, "color")
+  .onChange(
+    (c: number[]) =>
+      ((mesh.material as MeshBasicMaterial).color = c.map((v) => v / 255))
+  );
+gui.add(settings, "wireframe").onChange((w) => {
+  mesh.material.wireframe = w;
+  model.material.wireframe = w;
+});
+gui
+  .add(settings, "metallicFactor", 0, 1, 0.1)
+  .onChange(
+    (m) => ((model.material as MeshPhysicalMaterial).metallicFactor = m)
+  );
+gui
+  .add(settings, "roughnessFactor", 0, 1, 0.1)
+  .onChange(
+    (r) => ((model.material as MeshPhysicalMaterial).roughnessFactor = r)
+  );
+gui.add(settings, "stop").onChange((s) => {
+  cpn_1.stop = s;
+  cpn_2.stop = s;
+});
 
 export function frame() {
-  mesh.material.wireframe = settings.wireframe;
   scene.render();
   requestAnimationFrame(frame);
 }
