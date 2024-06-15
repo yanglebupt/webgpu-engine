@@ -1,5 +1,7 @@
 import { CreateTextureOptions, getSourceSize, numMipLevels } from "./loader";
 import { bilinearFilter } from "./math";
+import { GPUShaderModuleCacheKey } from "./scene/cache";
+import { ShaderCode, ShaderContext, ShaderModuleCode } from "./shaders";
 import { GPUResource } from "./type";
 export interface GPUSupport {
   gpu: GPU;
@@ -192,6 +194,31 @@ export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
     }
   }
   return entries;
+}
+
+export type ShaderCodeWithContext = {
+  shaderCode: ShaderCode;
+  context?: ShaderContext;
+};
+
+export function injectShaderCode<T extends Record<string, any>>(
+  fragment: ShaderCodeWithContext,
+  inject: string | Function,
+  ...injectContext: any[]
+): GPUShaderModuleCacheKey<T> {
+  return {
+    code: (context: ShaderContext<T>) => {
+      return `
+        ${
+          typeof inject === "function"
+            ? Reflect.apply(inject, null, injectContext)
+            : inject
+        }
+        ${fragment.shaderCode.code(context)}
+      `;
+    },
+    context: fragment.context ?? {},
+  };
 }
 
 // 后续可以删除这部分

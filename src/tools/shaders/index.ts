@@ -1,3 +1,8 @@
+export interface ShaderCode<T = Record<string, any>> {
+  DataDefinition: string;
+  code: ShaderModuleCode<T>;
+}
+
 export enum ShaderLocation {
   POSITION = 0,
   NORMAL = 1,

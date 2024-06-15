@@ -1,68 +1,94 @@
-import { createComputePipeline, getBindGroupEntries } from "..";
+import {
+  ShaderCodeWithContext,
+  createComputePipeline,
+  getBindGroupEntries,
+  injectShaderCode,
+} from "..";
+import { Logger } from "../helper";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions } from "../scene/types";
+import { ShaderCode, ShaderContext } from "../shaders";
 import { GPUResourceView } from "../type";
-import { DispatchCompute } from "../utils/Dispatch";
+import { DispatchCompute, axis } from "../utils/Dispatch";
 import { Pass } from "./Pass";
 
-export const InputBindGroupShaderCode = (format: GPUTextureFormat) => /*wgsl*/ `
+export function getChunkInfo(context: ShaderContext) {
+  const { order, chunkSize } = context;
+  const [width_idx, height_idx] = order;
+  const wh = `${axis[width_idx]}${axis[height_idx]}`;
+  return { wh, chunk_size: chunkSize.join(",") };
+}
+
+export class ComputePass extends Pass<GPUComputePipeline> {
+  static features: GPUFeatureName[] = ["bgra8unorm-storage"];
+  static InjectShaderCode = (format: GPUTextureFormat) => /*wgsl*/ `
 @group(0) @binding(0) var inputTexture: texture_2d<f32>;
 @group(0) @binding(1) var outputTexture: texture_storage_2d<${format}, write>;
 `;
+  static startBinding = 2;
 
-export class ComputePass extends Pass {
-  static features: GPUFeatureName[] = ["bgra8unorm-storage"];
-  texture!: GPUTexture;
-  pipeline!: GPUComputePipeline;
-  dispatchSize!: number[];
+  private customDispatch = false;
+  private inject = true;
+  private dispatchSize?: number[];
 
   constructor(
-    public compute: GPUShaderModuleCacheKey<any>,
+    compute: ShaderCodeWithContext,
+    resourceViews?: Array<GPUResourceView>,
+    parallel?: { dispatchSize?: number[]; inject?: boolean }
+  );
+  constructor(
+    compute: ShaderCode,
+    resourceViews?: Array<GPUResourceView>,
+    parallel?: { dispatchSize?: number[]; inject?: boolean }
+  );
+
+  constructor(
+    compute: ShaderCodeWithContext | ShaderCode,
     // 自定义资源
-    resourceViews?: Array<{ [key: string]: GPUResourceView }>
+    resourceViews: Array<GPUResourceView> = [],
+    // 自定义并行
+    parallel?: { dispatchSize?: number[]; inject?: boolean }
   ) {
-    super();
+    super(
+      compute,
+      resourceViews,
+      ComputePass.startBinding,
+      GPUShaderStage.COMPUTE
+    );
+    const { dispatchSize, inject } = parallel ?? {};
+    this.inject = inject ?? false;
+    this.dispatchSize = dispatchSize;
+    this.customDispatch = !(
+      dispatchSize === null ||
+      dispatchSize === undefined ||
+      dispatchSize.length === 0
+    );
   }
 
-  render(
-    encoder: GPUCommandEncoder,
-    device: GPUDevice,
-    texture: GPUTexture,
-    options: { isEnd: boolean; target?: GPUTexture }
-  ) {
+  render(pass: GPUComputePassEncoder, device: GPUDevice, texture: GPUTexture) {
+    super.update(device);
+
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
-      entries: getBindGroupEntries([
-        texture.createView(),
-        this.texture.createView(),
-      ]),
+      entries: getBindGroupEntries(
+        [texture.createView(), this.texture.createView()],
+        this.resources
+      ),
     });
-    const pass = encoder.beginComputePass();
+
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, bindGroup);
     pass.dispatchWorkgroups(
-      this.dispatchSize[0],
-      this.dispatchSize[1],
-      this.dispatchSize[2]
+      this.dispatchSize![0],
+      this.dispatchSize![1],
+      this.dispatchSize![2]
     );
-    pass.end();
-
-    const { isEnd, target } = options;
-    if (isEnd && target) {
-      if (target.format === this.texture.format)
-        encoder.copyTextureToTexture(
-          { texture: this.texture },
-          { texture: target },
-          [target.width, target.height]
-        );
-      else {
-        // 绘制
-        console.log("draw compute results...");
-      }
-    }
   }
 
-  build({ device, cached }: BuildOptions, descriptor: GPUTextureDescriptor) {
+  build(options: BuildOptions, descriptor: GPUTextureDescriptor) {
+    super.build(options, descriptor);
+
+    const { device, cached } = options;
     const format =
       descriptor.format === "bgra8unorm" &&
       device.features.has("bgra8unorm-storage")
@@ -90,21 +116,50 @@ export class ComputePass extends Pass {
           viewDimension: "2d",
         },
       },
+      ...this.addonBindGroupEntries,
     ]);
 
     const { chunkSize, dispatchSize, order } = DispatchCompute.dispatch(
       device,
       descriptor.size as number[]
     );
-    this.dispatchSize = dispatchSize;
-    this.pipeline = createComputePipeline(
-      this.compute.code({ format, chunkSize, order, ...this.compute.context }),
-      device,
+
+    if (!this.customDispatch) {
+      this.dispatchSize = dispatchSize;
+    }
+
+    const compute = injectShaderCode(
       {
-        layout: device.createPipelineLayout({
-          bindGroupLayouts: [bindGroupLayout],
-        }),
-      }
+        shaderCode: this.shaderCode.shaderCode,
+        context: { chunkSize, order, ...this.shaderCode.context },
+      },
+      ComputePass.InjectShaderCode,
+      format
     );
+
+    let codeStr = compute.code(compute.context);
+    if (this.inject) {
+      /* 
+        注入一些变量 @inject(chunk_size) @inject(wh)
+      */
+      codeStr = this.parseCode(compute, getChunkInfo(compute.context));
+      Logger.log("inject....");
+    }
+
+    this.pipeline = createComputePipeline(codeStr, device, {
+      layout: device.createPipelineLayout({
+        bindGroupLayouts: [bindGroupLayout],
+      }),
+    });
+  }
+
+  parseCode(compute: GPUShaderModuleCacheKey<any>, args: Record<string, any>) {
+    const { code, context } = compute;
+    const str = code(context);
+    const fliterStr = str.replaceAll(/@inject\((.*?)\)/g, function () {
+      const key = arguments[1];
+      return args[key];
+    });
+    return fliterStr;
   }
 }

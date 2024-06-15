@@ -1,3 +1,4 @@
+import { Logger } from "../helper";
 import { WebGPURenderer } from "../renderer";
 import { Scene } from "../scene";
 import { Renderable } from "../scene/types";
@@ -11,6 +12,7 @@ export class EffectComposer implements Renderable<() => void> {
   device: GPUDevice;
   canvasAppended: boolean = false;
   descriptor: GPUTextureDescriptor;
+  private computePass: GPUComputePassEncoder | null = null;
 
   constructor(public scene: Scene) {
     this.renderer = scene.renderer;
@@ -47,7 +49,34 @@ export class EffectComposer implements Renderable<() => void> {
           : this.renderer.ctx.getCurrentTexture();
       const isEnd = idx === this.passes.length - 1;
       const target = isEnd ? this.renderer.ctx.getCurrentTexture() : undefined;
-      pass.render(encoder, this.device, txt, { isEnd, target });
+
+      // 对于 computePass 如果靠在一起，可以使用一个 pass，不用切换
+      if (pass instanceof ComputePass) {
+        if (this.computePass === null)
+          this.computePass = encoder.beginComputePass();
+        pass.render(this.computePass, this.device, txt);
+      } else if (pass instanceof RenderPass) {
+        this.computePass?.end();
+        this.computePass = null;
+        pass.render(encoder, this.device, txt);
+      }
+
+      if (isEnd) {
+        this.computePass?.end();
+        this.computePass = null;
+        if (target) {
+          if (target.format === pass.texture.format)
+            encoder.copyTextureToTexture(
+              { texture: pass.texture },
+              { texture: target },
+              [target.width, target.height]
+            );
+          else {
+            // 绘制
+            console.info("draw compute results...");
+          }
+        }
+      }
     });
     this.device.queue.submit([encoder.finish()]);
   }

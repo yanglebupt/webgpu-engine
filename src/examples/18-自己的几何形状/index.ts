@@ -24,6 +24,7 @@ import { RenderPass } from "../../tools/postprocess/RenderPass";
 import fragment from "./shaders/fragments/test.wgsl";
 import compute from "./shaders/computes/test.wgsl";
 import { ComputePass } from "../../tools/postprocess/ComputePass";
+import { Uniform } from "../../tools/textures/ResourceBuffer";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
@@ -78,9 +79,14 @@ const cpn_2 = model.addComponent(RotateScript);
 scene.add(mesh);
 scene.add(model);
 
+const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);
-composer.addPass(new RenderPass({ code: fragment, context: {} }));
-// composer.addPass(new ComputePass({ code: compute, context: {} }));
+const pass = new RenderPass(fragment, [
+  new Uniform("uni", { li: 0.2 }),
+  texture,
+]);
+
+composer.addPass(pass);
 
 const settings = {
   color: [255, 0, 0, 255],
@@ -88,6 +94,7 @@ const settings = {
   stop: true,
   metallicFactor: 1,
   roughnessFactor: 1,
+  li: 0.2,
 };
 const gui = new GUI();
 gui
@@ -115,8 +122,12 @@ gui.add(settings, "stop").onChange((s) => {
   cpn_2.stop = s;
 });
 
+gui.add(settings, "li", 0.01, 2).onChange((l) => {
+  (pass.resourceViews[0] as Uniform).value.li = l;
+});
+
 export function frame() {
-  // scene.render();
   composer.render();
+  // scene.render();
   requestAnimationFrame(frame);
 }

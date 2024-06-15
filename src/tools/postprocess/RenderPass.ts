@@ -1,41 +1,47 @@
-import { makeShaderDataDefinitions, makeStructuredView } from "webgpu-utils";
-import { getBindGroupEntries } from "..";
-import { GPUShaderModuleCacheKey } from "../scene/cache";
+import {
+  ShaderCodeWithContext,
+  getBindGroupEntries,
+  injectShaderCode,
+} from "..";
 import { BuildOptions } from "../scene/types";
+import { ShaderCode } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/full-plane.wgsl";
-import { GPUResource, GPUResourceView } from "../type";
+import { GPUResourceView } from "../type";
 import { Pass } from "./Pass";
 
-export const InputBindGroupShaderCode = /*wgsl*/ `
-@group(0) @binding(0) var _sampler: sampler;
-@group(0) @binding(1) var inputTexture: texture_2d<f32>;
+export class RenderPass extends Pass<GPURenderPipeline> {
+  static InjectShaderCode = /*wgsl*/ `
+@group(0) @binding(0) var inputTexture: texture_2d<f32>;
+@group(0) @binding(1) var _sampler: sampler;
 `;
-
-export class RenderPass extends Pass {
-  texture!: GPUTexture;
-  pipeline!: GPURenderPipeline;
-  resources!: GPUResource[];
+  static startBinding = 2;
 
   constructor(
-    public fragment: GPUShaderModuleCacheKey<any>,
+    fragment: ShaderCodeWithContext,
+    resourceViews?: Array<GPUResourceView>
+  );
+  constructor(fragment: ShaderCode, resourceViews?: Array<GPUResourceView>);
+  constructor(
+    fragment: ShaderCodeWithContext | ShaderCode,
     // 自定义资源
-    resourceViews?: Array<{ [key: string]: GPUResourceView }>
+    resourceViews: Array<GPUResourceView> = []
   ) {
-    super();
-    const fragmentStr = fragment.code(fragment.context);
-    const defs = makeShaderDataDefinitions(fragmentStr);
+    super(
+      fragment,
+      resourceViews,
+      RenderPass.startBinding,
+      GPUShaderStage.FRAGMENT
+    );
   }
 
-  render(
-    encoder: GPUCommandEncoder,
-    device: GPUDevice,
-    texture: GPUTexture,
-    options: { isEnd: boolean; target?: GPUTexture }
-  ) {
+  render(encoder: GPUCommandEncoder, device: GPUDevice, texture: GPUTexture) {
+    super.update(device);
+
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
-      entries: getBindGroupEntries([...this.resources, texture.createView()]),
+      entries: getBindGroupEntries([texture.createView()], this.resources),
     });
+
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -49,43 +55,38 @@ export class RenderPass extends Pass {
     pass.setBindGroup(0, bindGroup);
     pass.draw(3);
     pass.end();
-
-    const { isEnd, target } = options;
-    if (isEnd && target) {
-      encoder.copyTextureToTexture(
-        { texture: this.texture },
-        { texture: target },
-        [target.width, target.height]
-      );
-    }
   }
 
-  build(
-    { device, cached, format }: BuildOptions,
-    descriptor: GPUTextureDescriptor
-  ) {
+  build(options: BuildOptions, descriptor: GPUTextureDescriptor) {
+    super.build(options, descriptor);
+
+    const { device, cached, format } = options;
     this.texture = device.createTexture({
       ...descriptor,
       usage: descriptor.usage | GPUTextureUsage.RENDER_ATTACHMENT,
     });
+
     const bindGroupLayout = cached.bindGroupLayout.get([
       {
         binding: 0,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: "filtering" },
-      },
-      {
-        binding: 1,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {
           viewDimension: "2d",
         },
       },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: "filtering" },
+      },
+      ...this.addonBindGroupEntries,
     ]);
-    this.resources = [cached.sampler.default];
+
+    this.resources.unshift(cached.sampler.default);
+
     this.pipeline = cached.pipeline.get(
       { code: vertex, context: { flipY: true } },
-      this.fragment,
+      injectShaderCode(this.shaderCode, RenderPass.InjectShaderCode),
       {
         format,
         primitive: { topology: "triangle-list" },
