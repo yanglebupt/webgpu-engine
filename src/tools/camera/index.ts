@@ -84,8 +84,9 @@ export class OrbitController implements Updatable {
   }
 
   createArcBallCamera(eye: Vec3, target: Vec3, up: Vec3) {
-    const width = this.canvas.clientWidth;
-    const height = this.canvas.clientHeight;
+    const width = this.canvas.clientWidth || parseInt(this.canvas.style.width);
+    const height =
+      this.canvas.clientHeight || parseInt(this.canvas.style.height);
     const { zoomSpeed } = this.options ?? {};
     const orbitController = new ArcballCamera(
       eye,

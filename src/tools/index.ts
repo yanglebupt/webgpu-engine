@@ -1,5 +1,6 @@
 import { CreateTextureOptions, getSourceSize, numMipLevels } from "./loader";
 import { bilinearFilter } from "./math";
+import { GPUResource } from "./type";
 export interface GPUSupport {
   gpu: GPU;
   adapter: GPUAdapter;
@@ -152,6 +153,7 @@ export function createRenderPipeline(
 ) {
   // 根据 vertex shader 和 fragment shader 创建渲染管线
   return device.createRenderPipeline({
+    layout: "auto",
     vertex: {
       module: device.createShaderModule({
         code: vertex,
@@ -170,14 +172,31 @@ export function createRenderPipeline(
       topology: "triangle-list", // 指定点的组合方式
       ...descriptor?.primitive,
     },
-    layout: "auto",
     ...descriptor,
   });
 }
 
-export function extractMipmapFromTexture() {}
+export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
+  const entries: GPUBindGroupEntry[] = [];
+  let binding = 0;
+  for (let i = 0; i < resourcesList.length; i++) {
+    const resources = resourcesList[i];
+    for (let j = 0; j < resources.length; j++) {
+      const resource = resources[j];
+      entries.push({
+        binding,
+        resource:
+          resource instanceof GPUBuffer ? { buffer: resource } : resource,
+      });
+      binding++;
+    }
+  }
+  return entries;
+}
 
 // 后续可以删除这部分
+export function extractMipmapFromTexture() {}
+
 type MipMapTextureType = {
   data: Uint8Array;
   width: number;

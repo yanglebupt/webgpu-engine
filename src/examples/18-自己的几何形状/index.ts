@@ -19,9 +19,18 @@ import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { MeshPhysicalMaterial } from "../../tools/materials/MeshPhysicalMaterial";
 import { Texture } from "../../tools/textures/Texture";
 import { AmbientLight, DirectionLight } from "../../tools/lights";
+import { EffectComposer } from "../../tools/postprocess/EffectComposer";
+import { RenderPass } from "../../tools/postprocess/RenderPass";
+import fragment from "./shaders/fragments/test.wgsl";
+import compute from "./shaders/computes/test.wgsl";
+import { ComputePass } from "../../tools/postprocess/ComputePass";
 
 // 新建一个 WebGPURenderer
-const renderer = (await new WebGPURenderer()
+const renderer = (await new WebGPURenderer({
+  canvasConfig: {
+    config: { virtual: true },
+  },
+})
   .checkSupport()
   .catch(({ message }) => {
     const div = document.createElement("div");
@@ -69,6 +78,10 @@ const cpn_2 = model.addComponent(RotateScript);
 scene.add(mesh);
 scene.add(model);
 
+const composer = new EffectComposer(scene);
+composer.addPass(new RenderPass({ code: fragment, context: {} }));
+// composer.addPass(new ComputePass({ code: compute, context: {} }));
+
 const settings = {
   color: [255, 0, 0, 255],
   wireframe: false,
@@ -103,6 +116,7 @@ gui.add(settings, "stop").onChange((s) => {
 });
 
 export function frame() {
-  scene.render();
+  // scene.render();
+  composer.render();
   requestAnimationFrame(frame);
 }

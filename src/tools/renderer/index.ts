@@ -1,4 +1,4 @@
-import { checkWebGPUSupported, createCanvas } from "..";
+import { CreateCanvasConfig, checkWebGPUSupported, createCanvas } from "..";
 import { StorageTextureToCanvas } from "../helper";
 import { Scene } from "../scene";
 import { BuildCache } from "../scene/types";
@@ -11,6 +11,31 @@ import {
   GPUSamplerCache,
   SolidColorTextureCache,
 } from "../scene/cache";
+import { ComputePass } from "../postprocess/ComputePass";
+
+export type CreateCanvasParameters = {
+  config?: {
+    scale?: boolean;
+    virtual?: boolean;
+  };
+  className?: string;
+  parentID?: string;
+} & (
+  | {
+      width?: number | string;
+      height?: number | string;
+    }
+  | {
+      showSize: {
+        width: number | string;
+        height: number | string;
+      };
+      pixelSize: {
+        width: number;
+        height: number;
+      };
+    }
+);
 
 export interface WebGPURenderer {
   gpu: GPU;
@@ -25,28 +50,39 @@ export interface WebGPURenderer {
   aspect: number;
   antialias: boolean;
   alphaMode: GPUCanvasAlphaMode;
+  backgroundColor: GPUColor;
+  canvasConfig: CreateCanvasParameters;
 }
 
 export class WebGPURenderer {
   static features: GPUFeatureName[] = [];
-  public className?: string;
-  public parentID?: string;
-  public cached?: BuildCache;
-  public backgroundColor!: GPUColor;
+  cached?: BuildCache;
   constructor(
     options?: Partial<{
-      className: string;
-      parentID: string;
       antialias: boolean;
       backgroundColor: GPUColor;
       alphaMode: GPUCanvasAlphaMode;
+      canvasConfig: CreateCanvasParameters;
     }>
   ) {
-    Object.assign(this, { backgroundColor: [0, 0, 0, 1], ...options });
+    this.canvasConfig = {
+      width: 500,
+      height: 500,
+    };
+    Object.assign(this.canvasConfig, options?.canvasConfig);
+    if (options) Reflect.deleteProperty(options, "canvasConfig");
+    Object.assign(this, {
+      backgroundColor: [0, 0, 0, 1],
+      ...options,
+    });
   }
 
   private static __collectDeviceFeatures() {
-    return [...WebGPURenderer.features, ...EnvMap.features];
+    return [
+      ...WebGPURenderer.features,
+      ...EnvMap.features,
+      ...ComputePass.features,
+    ];
   }
 
   // 申请设备功能
@@ -61,24 +97,36 @@ export class WebGPURenderer {
       { requiredFeatures: WebGPURenderer.__collectDeviceFeatures() }
     );
     const { device, format } = gpuSupport;
+    const { className, parentID, config, width, height, showSize, pixelSize } =
+      this.canvasConfig as any;
     const canvasReturn = createCanvas(
-      500,
-      500,
-      { device, format, alphaMode: this.alphaMode },
-      this.className,
-      this.parentID
+      showSize ?? width,
+      pixelSize ?? height,
+      {
+        device,
+        format,
+        alphaMode: this.alphaMode,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_DST |
+          GPUTextureUsage.COPY_SRC,
+        ...config,
+      },
+      className,
+      parentID
     );
-    (this.cached = {
+    this.cached = {
       sampler: new GPUSamplerCache(device),
       solidColorTexture: new SolidColorTextureCache(device),
       pipeline: new GPURenderPipelineCache(device),
       bindGroupLayout: new GPUBindGroupLayoutCache(device),
-    }),
-      Object.assign(this, {
-        ...gpuSupport,
-        ...canvasReturn,
-        depthFormat: StaticTextureUtil.depthFormat,
-      });
+    };
+    Object.assign(this, {
+      ...gpuSupport,
+      ...canvasReturn,
+      depthFormat: StaticTextureUtil.depthFormat,
+    });
     return this;
   }
 
@@ -97,8 +145,14 @@ export class WebGPURenderer {
     return color;
   }
 
-  render(scene: Scene) {
-    const encoder = this.device.createCommandEncoder();
+  appendCanvas() {
+    const parentID = this.canvasConfig.parentID;
+    (parentID ? document.getElementById(parentID) : document.body)?.appendChild(
+      this.canvas
+    );
+  }
+
+  renderScene(scene: Scene, encoder: GPUCommandEncoder) {
     // 非实时计算，只需要一次即可
     const realtime = scene.options?.realtime ?? false;
     const envMap = scene.options?.envMap;
@@ -166,9 +220,14 @@ export class WebGPURenderer {
       }
     }
 
-    this.device.queue.submit([encoder.finish()]);
     if (!realtime && envMap) {
       envMap.done();
     }
+  }
+
+  render(scene: Scene) {
+    const encoder = this.device.createCommandEncoder();
+    this.renderScene(scene, encoder);
+    this.device.queue.submit([encoder.finish()]);
   }
 }

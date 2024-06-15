@@ -1,3 +1,4 @@
+import { getBindGroupEntries } from "..";
 import { EntityObject } from "../entitys/EntityObject";
 import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
 import { WatchAction } from "../materials/Material";
@@ -10,24 +11,6 @@ import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
 import { GPUResource } from "../type";
 import { getBlendFromPreset } from "../utils/Blend";
 import { ObservableActionParams, ObservableProxy } from "../utils/Observable";
-
-export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
-  const entries: GPUBindGroupEntry[] = [];
-  let binding = 0;
-  for (let i = 0; i < resourcesList.length; i++) {
-    const resources = resourcesList[i];
-    for (let j = 0; j < resources.length; j++) {
-      const resource = resources[j];
-      entries.push({
-        binding,
-        resource:
-          resource instanceof GPUBuffer ? { buffer: resource } : resource,
-      });
-      binding++;
-    }
-  }
-  return entries;
-}
 
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
