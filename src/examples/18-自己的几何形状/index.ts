@@ -26,6 +26,9 @@ import compute from "./shaders/computes/test.wgsl";
 import { ComputePass } from "../../tools/postprocess/ComputePass";
 import { Uniform } from "../../tools/textures/ResourceBuffer";
 import { GlitchPass } from "../../tools/postprocess/GlitchPass";
+import { ShaderMaterial } from "../../tools/materials/ShaderMaterial";
+import m_vertex from "./material/vertex.wgsl";
+import m_fragment from "./material/fragment.wgsl";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
@@ -79,6 +82,18 @@ const cpn_1 = mesh.addComponent(RotateScript);
 const cpn_2 = model.addComponent(RotateScript);
 scene.add(mesh);
 scene.add(model);
+
+const plane = new Mesh(
+  new PlaneGeometry({ width: 2, height: 2 }),
+  new ShaderMaterial({
+    vertex: m_vertex,
+    fragment: m_fragment,
+    resourceViews: {
+      fragment: [new Uniform("uni", { color: [1, 1, 0, 1] })],
+    },
+  })
+);
+scene.add(plane);
 
 const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);

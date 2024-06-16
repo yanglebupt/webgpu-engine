@@ -40,10 +40,10 @@ export class MeshBasicMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build({ device }: BuildOptions, bindingStart: number = 0) {
+  build({ device }: BuildOptions) {
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: bindingStart,
+        binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       },
@@ -53,9 +53,11 @@ export class MeshBasicMaterial extends MeshMaterial {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     return {
-      resources: [this.uniform],
-      bindGroupLayoutEntries,
-      fragment: { code: fragment, context: { bindingStart } },
+      fragment: {
+        resources: [this.uniform],
+        bindGroupLayoutEntries,
+        shader: { code: fragment, context: {} },
+      },
     };
   }
 }

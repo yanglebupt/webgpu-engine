@@ -51,9 +51,9 @@ export class ComputePass extends Pass<GPUComputePipeline> {
   ) {
     super(
       compute,
-      resourceViews,
+      GPUShaderStage.COMPUTE,
       ComputePass.startBinding,
-      GPUShaderStage.COMPUTE
+      resourceViews
     );
     const { dispatchSize, inject } = parallel ?? {};
     this.inject = inject ?? false;
@@ -116,7 +116,7 @@ export class ComputePass extends Pass<GPUComputePipeline> {
           viewDimension: "2d",
         },
       },
-      ...this.addonBindGroupEntries,
+      ...this.addonBindGroupLayoutEntries,
     ]);
 
     const { chunkSize, dispatchSize, order } = DispatchCompute.dispatch(
@@ -142,7 +142,7 @@ export class ComputePass extends Pass<GPUComputePipeline> {
       /* 
         注入一些变量 @inject(chunk_size) @inject(wh)
       */
-      codeStr = this.parseCode(compute, getChunkInfo(compute.context));
+      codeStr = this.injectCode(compute, getChunkInfo(compute.context));
       Logger.log("inject....");
     }
 
@@ -153,7 +153,7 @@ export class ComputePass extends Pass<GPUComputePipeline> {
     });
   }
 
-  parseCode(compute: GPUShaderModuleCacheKey<any>, args: Record<string, any>) {
+  injectCode(compute: GPUShaderModuleCacheKey<any>, args: Record<string, any>) {
     const { code, context } = compute;
     const str = code(context);
     const fliterStr = str.replaceAll(/@inject\((.*?)\)/g, function () {

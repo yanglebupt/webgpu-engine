@@ -115,20 +115,20 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build({ device, cached }: BuildOptions, bindingStart: number = 0) {
+  build({ device, cached }: BuildOptions) {
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: bindingStart,
+        binding: 0,
         visibility: GPUShaderStage.FRAGMENT,
         buffer: { type: "uniform" },
       },
       ...([1, 2, 3, 4, 5].map((binding) => ({
-        binding: bindingStart + binding,
+        binding: binding,
         visibility: GPUShaderStage.FRAGMENT,
         texture: { viewDimension: "2d" },
       })) as GPUBindGroupLayoutEntry[]),
       {
-        binding: bindingStart + 6,
+        binding: 6,
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: "filtering" },
       },
@@ -151,13 +151,15 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       }
     });
     return {
-      resources: [this.uniform, ...texturesView, cached.sampler.default],
-      bindGroupLayoutEntries,
       fragment: {
-        code: fragment,
-        context: {
-          polyfill: false,
-          useAlphaCutoff: this.useAlphaCutoff,
+        resources: [this.uniform, ...texturesView, cached.sampler.default],
+        bindGroupLayoutEntries,
+        shader: {
+          code: fragment,
+          context: {
+            polyfill: false,
+            useAlphaCutoff: this.useAlphaCutoff,
+          },
         },
       },
     };

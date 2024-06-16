@@ -306,43 +306,50 @@ export class Mesh<
     const bindGroups: GPUBindGroup[] = [];
     const bindGroupLayouts: GPUBindGroupLayout[] = [];
 
-    /////////////////////// 拆分成两个 bindGroup //////////////////////
-    let fragment;
+    /**
+     * vertex 和 fragment 拆分成两个 bindGroup
+     * ShaderMaterial 可能会修改 vertex，这里需要判断使用默认的 vertex 还是 material 提供的 vertex
+     */
+
+    const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
+    const { vertexResources } = this.componentBuildResult;
+
+    const { vertex, fragment } = this.material.build(
+      options,
+      bindGroupLayoutEntries.length
+    );
 
     {
-      const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
-      const { vertexResources } = this.componentBuildResult;
       const bindGroupLayout = cached.bindGroupLayout.get(
-        bindGroupLayoutEntries
+        bindGroupLayoutEntries.concat(vertex?.bindGroupLayoutEntries ?? [])
       );
       const bindGroup = device.createBindGroup({
         layout: bindGroupLayout,
-        entries: getBindGroupEntries(vertexResources, resources),
+        entries: getBindGroupEntries(
+          vertexResources,
+          resources,
+          vertex?.resources ?? []
+        ),
       });
       bindGroups.push(bindGroup);
       bindGroupLayouts.push(bindGroupLayout);
+      if (vertex) this.geometryBuildResult.vertex = vertex.shader;
     }
 
     {
-      const {
-        resources,
-        fragment: _fragment,
-        bindGroupLayoutEntries,
-      } = this.material.build(options);
       const bindGroupLayout = cached.bindGroupLayout.get(
-        bindGroupLayoutEntries
+        fragment.bindGroupLayoutEntries
       );
       const bindGroup = options.device.createBindGroup({
         layout: bindGroupLayout,
-        entries: getBindGroupEntries(resources),
+        entries: getBindGroupEntries(fragment.resources),
       });
       bindGroups.push(bindGroup);
       bindGroupLayouts.push(bindGroupLayout);
-      fragment = _fragment;
     }
 
     this.materialBuildResult = {
-      fragment,
+      fragment: fragment.shader,
       bindGroups,
       bindGroupLayouts: [scene.bindGroupLayout, ...bindGroupLayouts],
     };

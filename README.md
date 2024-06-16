@@ -117,15 +117,15 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 ## 目前困惑
 
 - alphaMode premultiplied 对于颜色该怎么处理，是在 shader 中弄还是外面直接对颜色处理
+- PostProcess 和 ShaderMaterial 涉及到 shader 代码注入，没法命中缓存。目前 compute pipeline 没有设置缓存
 
 ## TODO
 
 文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
 
-gltf 尝试合并 bindgroup 1 和 2，并尝试接入 Geometry 和 Material
-
 # 后续进度
 
+- gltf 尝试接入 Geometry 和 Material
 - 完善 gltf 中的骨骼动画
 - shadermaterial
 - 包围盒

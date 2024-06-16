@@ -14,15 +14,20 @@ export interface WatchPropertyKey {
   [key: PropertyKey]: WatchAction[];
 }
 
+export interface ShaderBuildResult {
+  bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
+  resources: GPUResource[];
+  shader: GPUShaderModuleCacheKey<any>;
+}
+
 export abstract class Material implements Observable {
   abstract watch: WatchPropertyKey;
   abstract update(device: GPUDevice): void;
   abstract build(
     options: BuildOptions,
-    bindingStart?: number
+    vertexBindingStart?: number
   ): {
-    bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
-    resources: GPUResource[];
-    fragment: GPUShaderModuleCacheKey<any>;
+    vertex?: ShaderBuildResult;
+    fragment: ShaderBuildResult;
   };
 }

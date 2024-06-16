@@ -1,8 +1,12 @@
+import { makeShaderDataDefinitions, makeStructuredView } from "webgpu-utils";
 import { CreateTextureOptions, getSourceSize, numMipLevels } from "./loader";
 import { bilinearFilter } from "./math";
-import { GPUShaderModuleCacheKey } from "./scene/cache";
-import { ShaderCode, ShaderContext, ShaderModuleCode } from "./shaders";
-import { GPUResource } from "./type";
+import { GPUSamplerCache, GPUShaderModuleCacheKey } from "./scene/cache";
+import { ShaderCode, ShaderContext } from "./shaders";
+import { GPUResource, GPUResourceView } from "./type";
+import { ResourceBuffer } from "./textures/ResourceBuffer";
+import { BuildOptions, Type } from "./scene/types";
+
 export interface GPUSupport {
   gpu: GPU;
   adapter: GPUAdapter;
@@ -202,7 +206,7 @@ export type ShaderCodeWithContext = {
 };
 
 export function injectShaderCode<T extends Record<string, any>>(
-  fragment: ShaderCodeWithContext,
+  shader: ShaderCodeWithContext,
   inject: string | Function,
   ...injectContext: any[]
 ): GPUShaderModuleCacheKey<T> {
@@ -214,14 +218,69 @@ export function injectShaderCode<T extends Record<string, any>>(
             ? Reflect.apply(inject, null, injectContext)
             : inject
         }
-        ${fragment.shaderCode.DataDefinition}
-        ${fragment.shaderCode.code(context)}
+        ${shader.shaderCode.DataDefinition}
+        ${shader.shaderCode.code(context)}
       `;
     },
-    context: fragment.context ?? {},
+    context: shader.context ?? {},
   };
 }
 
+export function getAddonBindGroupLayoutEntries(
+  shaderCode: ShaderCode,
+  visibility: GPUShaderStageFlags,
+  startBinding: number = 0,
+  resourceViews: Array<GPUResourceView> = []
+): GPUBindGroupLayoutEntry[] {
+  const defs = makeShaderDataDefinitions(shaderCode.DataDefinition);
+  return resourceViews.map((resourceView, idx) => {
+    if (resourceView instanceof ResourceBuffer) {
+      resourceView.bufferView = makeStructuredView(
+        defs.uniforms[resourceView.name]
+      );
+      return {
+        binding: startBinding + idx,
+        visibility,
+        buffer: { type: resourceView.type },
+      };
+    } else {
+      return {
+        binding: startBinding + idx,
+        visibility,
+        texture: { viewDimension: "2d" },
+      };
+    }
+  });
+}
+
+export function getResourcesfromViews(
+  device: GPUDevice,
+  cached: { sampler: GPUSamplerCache },
+  resourceViews: Array<GPUResourceView> = []
+) {
+  return resourceViews.map((resourceView) => {
+    if (resourceView instanceof ResourceBuffer) {
+      resourceView.upload(device);
+      return resourceView.buffer;
+    } else {
+      resourceView.upload(device, cached.sampler);
+      return resourceView.texture.createView();
+    }
+  });
+}
+
+export function updateResourceViews(
+  device: GPUDevice,
+  resourceViews: Array<GPUResourceView> = []
+) {
+  resourceViews.forEach((resourceView: any) => {
+    if (Type.isUpdatable(resourceView)) resourceView.update(device);
+  });
+}
+
+//////////
+///////////
+////////////
 // 后续可以删除这部分
 export function extractMipmapFromTexture() {}
 

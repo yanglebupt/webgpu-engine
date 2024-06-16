@@ -28,9 +28,9 @@ export class RenderPass extends Pass<GPURenderPipeline> {
   ) {
     super(
       fragment,
-      resourceViews,
+      GPUShaderStage.FRAGMENT,
       RenderPass.startBinding,
-      GPUShaderStage.FRAGMENT
+      resourceViews
     );
   }
 
@@ -79,7 +79,7 @@ export class RenderPass extends Pass<GPURenderPipeline> {
         visibility: GPUShaderStage.FRAGMENT,
         sampler: { type: "filtering" },
       },
-      ...this.addonBindGroupEntries,
+      ...this.addonBindGroupLayoutEntries,
     ]);
 
     this.resources.unshift(cached.sampler.default);
