@@ -214,6 +214,7 @@ export function injectShaderCode<T extends Record<string, any>>(
             ? Reflect.apply(inject, null, injectContext)
             : inject
         }
+        ${fragment.shaderCode.DataDefinition}
         ${fragment.shaderCode.code(context)}
       `;
     },

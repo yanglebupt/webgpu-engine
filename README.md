@@ -127,6 +127,10 @@ gltf 尝试合并 bindgroup 1 和 2，并尝试接入 Geometry 和 Material
 # 后续进度
 
 - 完善 gltf 中的骨骼动画
+- shadermaterial
+- 包围盒
+- 碰撞检测
+- 射线
 
 # 引用
 

@@ -61,9 +61,16 @@ export abstract class Pass<
     });
   }
 
-  update(device: GPUDevice) {
+  render(
+    device: GPUDevice,
+    encoder?: GPUCommandEncoder | GPUComputePassEncoder,
+    texture?: GPUTexture
+  ) {
+    this.update();
     this.resourceViews.forEach((resourceView: any) => {
       if (Type.isUpdatable(resourceView)) resourceView.update(device);
     });
   }
+
+  update() {}
 }

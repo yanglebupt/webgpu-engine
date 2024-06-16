@@ -12,7 +12,6 @@ struct UniformData {
   code(context: any) {
     const { chunk_size, wh } = getChunkInfo(context);
     return /* wgsl */ `
-${this.DataDefinition}
 @compute @workgroup_size(${chunk_size})
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let pixel = id.${wh};

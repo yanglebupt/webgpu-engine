@@ -25,6 +25,7 @@ import fragment from "./shaders/fragments/test.wgsl";
 import compute from "./shaders/computes/test.wgsl";
 import { ComputePass } from "../../tools/postprocess/ComputePass";
 import { Uniform } from "../../tools/textures/ResourceBuffer";
+import { GlitchPass } from "../../tools/postprocess/GlitchPass";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
@@ -81,12 +82,15 @@ scene.add(model);
 
 const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);
-const pass = new RenderPass(fragment, [
-  new Uniform("uni", { li: 0.2 }),
-  texture,
-]);
 
-composer.addPass(pass);
+// const pass = new RenderPass(fragment, [
+//   new Uniform("uni", { li: 0.2 }),
+//   texture,
+// ]);
+// composer.addPass(pass);
+
+const pass_2 = new GlitchPass();
+composer.addPass(pass_2);
 
 const settings = {
   color: [255, 0, 0, 255],
@@ -123,7 +127,7 @@ gui.add(settings, "stop").onChange((s) => {
 });
 
 gui.add(settings, "li", 0.01, 2).onChange((l) => {
-  (pass.resourceViews[0] as Uniform).value.li = l;
+  // (pass.resourceViews[0] as Uniform).value.li = l;
 });
 
 export function frame() {

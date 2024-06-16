@@ -10,7 +10,6 @@ struct UniformData {
 `,
   code() {
     return /* wgsl */ `
-${this.DataDefinition}
 @fragment
 fn main(@location(0) tc: vec2f) -> @location(0) vec4f {
   var col = textureSample(inputTexture, _sampler, tc);

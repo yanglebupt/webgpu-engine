@@ -65,8 +65,8 @@ export class ComputePass extends Pass<GPUComputePipeline> {
     );
   }
 
-  render(pass: GPUComputePassEncoder, device: GPUDevice, texture: GPUTexture) {
-    super.update(device);
+  render(device: GPUDevice, pass: GPUComputePassEncoder, texture: GPUTexture) {
+    super.render(device);
 
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),

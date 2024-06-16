@@ -34,8 +34,8 @@ export class RenderPass extends Pass<GPURenderPipeline> {
     );
   }
 
-  render(encoder: GPUCommandEncoder, device: GPUDevice, texture: GPUTexture) {
-    super.update(device);
+  render(device: GPUDevice, encoder: GPUCommandEncoder, texture: GPUTexture) {
+    super.render(device);
 
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),

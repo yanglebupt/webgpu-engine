@@ -1,4 +1,8 @@
-import { createTextureFromSource } from "webgpu-utils";
+import {
+  TextureSource,
+  createTextureFromSource,
+  getSizeFromSource,
+} from "webgpu-utils";
 import { maxMipLevelCount } from "../utils/mipmaps";
 import { GPUSamplerCache } from "../scene/cache";
 
@@ -10,7 +14,7 @@ export interface Texture {
 
 export class Texture {
   sampler!: GPUSampler;
-  source!: ImageBitmap;
+  source!: TextureSource;
   texture!: GPUTexture;
   private filename: string;
 
@@ -34,7 +38,7 @@ export class Texture {
     cached: GPUSamplerCache,
     format?: GPUTextureFormat
   ) {
-    const { width, height } = this.source;
+    const [width, height] = getSizeFromSource(this.source, {});
     this.sampler = this.samplerDescriptor
       ? cached.get(this.samplerDescriptor)
       : cached.default;

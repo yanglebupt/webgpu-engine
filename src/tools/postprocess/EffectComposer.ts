@@ -1,4 +1,3 @@
-import { Logger } from "../helper";
 import { WebGPURenderer } from "../renderer";
 import { Scene } from "../scene";
 import { Renderable } from "../scene/types";
@@ -54,11 +53,11 @@ export class EffectComposer implements Renderable<() => void> {
       if (pass instanceof ComputePass) {
         if (this.computePass === null)
           this.computePass = encoder.beginComputePass();
-        pass.render(this.computePass, this.device, txt);
+        pass.render(this.device, this.computePass, txt);
       } else if (pass instanceof RenderPass) {
         this.computePass?.end();
         this.computePass = null;
-        pass.render(encoder, this.device, txt);
+        pass.render(this.device, encoder, txt);
       }
 
       if (isEnd) {
