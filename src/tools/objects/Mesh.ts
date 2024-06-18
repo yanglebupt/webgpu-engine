@@ -1,7 +1,7 @@
 import { getBindGroupEntries } from "..";
 import { EntityObject } from "../entitys/EntityObject";
 import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
-import { WatchAction } from "../materials/Material";
+import { ShaderBuildResult, WatchAction } from "../materials/Material";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions, Buildable, Renderable } from "../scene/types";
@@ -25,11 +25,17 @@ export class Mesh<
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   public geometry: G;
-  public _material: M;
+  private _material: M;
   public name: string = "Mesh";
 
   private buildOptions!: BuildOptions;
   private renderPipeline!: GPURenderPipeline;
+
+  private materialBuildResult!: {
+    vertex?: ShaderBuildResult;
+    fragment: ShaderBuildResult;
+    vertexBindingStart: number;
+  };
 
   private geometryBuildResult!: {
     vertexCount: number;
@@ -45,16 +51,22 @@ export class Mesh<
     } | null;
   };
 
-  private materialBuildResult!: {
-    bindGroups: GPUBindGroup[];
-    bindGroupLayouts: GPUBindGroupLayout[];
-    fragment: GPUShaderModuleCacheKey<any>;
-  };
-
   private componentBuildResult!: {
     transformUniformValue: Float32Array;
     transformUniform: GPUBuffer;
     vertexResources: GPUResource[];
+  };
+
+  private vertexResources!: {
+    bindGroups: GPUBindGroup[];
+    bindGroupLayouts: GPUBindGroupLayout[];
+    code: GPUShaderModuleCacheKey<any>;
+  };
+
+  private fragmentResources!: {
+    bindGroups: GPUBindGroup[];
+    bindGroupLayouts: GPUBindGroupLayout[];
+    code: GPUShaderModuleCacheKey<any>;
   };
 
   constructor(geometry: G, material: M) {
@@ -80,6 +92,11 @@ export class Mesh<
   onChange({ payload }: ObservableActionParams) {
     (payload as WatchAction[]).forEach((p) => {
       Reflect.apply(this[p], this, this.getArgumentsList(p));
+      // 副作用
+      if (p === WatchAction.Component || p === WatchAction.Geometry)
+        this.buildVertexResources(this.buildOptions);
+      else if (p === WatchAction.Material)
+        this.buildFragmentResources(this.buildOptions);
     });
   }
 
@@ -92,10 +109,9 @@ export class Mesh<
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
     this.updateBuffers(device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
-    const { bindGroups } = this.materialBuildResult;
     renderPass.setPipeline(this.renderPipeline);
     if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
-    bindGroups.forEach((group, index) => {
+    this.bindGroups.forEach((group, index) => {
       renderPass.setBindGroup(index + 1, group);
     });
     if (indices) {
@@ -123,14 +139,15 @@ export class Mesh<
     const useNormal = !!normals;
     const useTexcoord = !!uvs;
 
+    const { vertexBindingStart: bindingStart } = this.materialBuildResult;
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: 0,
+        binding: bindingStart,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       },
       {
-        binding: 1,
+        binding: bindingStart + 1,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       },
@@ -157,7 +174,7 @@ export class Mesh<
       device.queue.writeBuffer(buffer, 0, indicesU32);
       resources.push(buffer);
       bindGroupLayoutEntries.push({
-        binding: 2,
+        binding: bindingStart + 2,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       });
@@ -171,7 +188,7 @@ export class Mesh<
       device.queue.writeBuffer(buffer, 0, normals);
       resources.push(buffer);
       bindGroupLayoutEntries.push({
-        binding: 3,
+        binding: bindingStart + 3,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       });
@@ -185,7 +202,7 @@ export class Mesh<
       device.queue.writeBuffer(buffer, 0, uvs);
       resources.push(buffer);
       bindGroupLayoutEntries.push({
-        binding: 4,
+        binding: bindingStart + 4,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       });
@@ -193,7 +210,10 @@ export class Mesh<
 
     this.geometryBuildResult = {
       vertexCount: (hasIndices ? indices.length : vertexCount) * 2,
-      vertex: { code: wireframe, context: { useNormal, useTexcoord } },
+      vertex: {
+        code: wireframe,
+        context: { useNormal, useTexcoord, bindingStart },
+      },
       resources,
       indices: null,
       bindGroupLayoutEntries: bindGroupLayoutEntries,
@@ -263,11 +283,15 @@ export class Mesh<
       device.queue.writeBuffer(indexBuffer, 0, indices);
     }
 
+    const { vertexBindingStart: bindingStart } = this.materialBuildResult;
     this.geometryBuildResult = {
       vertexCount,
       vertexBuffer,
       bufferLayout,
-      vertex: { code: vertex, context: { useNormal, useTexcoord } },
+      vertex: {
+        code: vertex,
+        context: { useNormal, useTexcoord, bindingStart },
+      },
       indices: indices
         ? {
             buffer: indexBuffer!,
@@ -277,7 +301,7 @@ export class Mesh<
         : null,
       bindGroupLayoutEntries: [
         {
-          binding: 0,
+          binding: bindingStart,
           visibility: GPUShaderStage.VERTEX,
           buffer: { type: "read-only-storage" },
         },
@@ -302,62 +326,79 @@ export class Mesh<
   }
 
   buildMaterial(options: BuildOptions) {
-    const { device, cached, scene } = options;
-    const bindGroups: GPUBindGroup[] = [];
-    const bindGroupLayouts: GPUBindGroupLayout[] = [];
+    const res = this.material.build(options);
+    const vertexBindingStart = res.vertex?.bindGroupLayoutEntries.length ?? 0;
+    this.materialBuildResult = { vertexBindingStart, ...res };
+  }
 
-    /**
-     * vertex 和 fragment 拆分成两个 bindGroup
-     * ShaderMaterial 可能会修改 vertex，这里需要判断使用默认的 vertex 还是 material 提供的 vertex
-     */
+  /**
+   * vertex 和 fragment 拆分成两个 bindGroup
+   * ShaderMaterial 可能会修改 vertex，这里需要判断使用默认的 vertex 还是 material 提供的 vertex
+   */
+  buildVertexResources(options: BuildOptions) {
+    const { device, cached, scene } = options;
 
     const { bindGroupLayoutEntries, resources } = this.geometryBuildResult;
     const { vertexResources } = this.componentBuildResult;
+    const { vertex } = this.materialBuildResult;
 
-    const { vertex, fragment } = this.material.build(
-      options,
-      bindGroupLayoutEntries.length
+    const bindGroupLayout = cached.bindGroupLayout.get(
+      (vertex?.bindGroupLayoutEntries ?? []).concat(bindGroupLayoutEntries)
     );
+    const bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: getBindGroupEntries(
+        vertex?.resources ?? [],
+        vertexResources,
+        resources
+      ),
+    });
 
-    {
-      const bindGroupLayout = cached.bindGroupLayout.get(
-        bindGroupLayoutEntries.concat(vertex?.bindGroupLayoutEntries ?? [])
-      );
-      const bindGroup = device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: getBindGroupEntries(
-          vertexResources,
-          resources,
-          vertex?.resources ?? []
-        ),
-      });
-      bindGroups.push(bindGroup);
-      bindGroupLayouts.push(bindGroupLayout);
-      if (vertex) this.geometryBuildResult.vertex = vertex.shader;
-    }
+    this.vertexResources = {
+      bindGroupLayouts: [scene.bindGroupLayout, bindGroupLayout],
+      bindGroups: [bindGroup],
+      code: !!vertex ? vertex.shader : this.geometryBuildResult.vertex,
+    };
+  }
 
-    {
-      const bindGroupLayout = cached.bindGroupLayout.get(
-        fragment.bindGroupLayoutEntries
-      );
-      const bindGroup = options.device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: getBindGroupEntries(fragment.resources),
-      });
-      bindGroups.push(bindGroup);
-      bindGroupLayouts.push(bindGroupLayout);
-    }
+  buildFragmentResources(options: BuildOptions) {
+    const { cached } = options;
+    const { fragment } = this.materialBuildResult;
 
-    this.materialBuildResult = {
-      fragment: fragment.shader,
-      bindGroups,
-      bindGroupLayouts: [scene.bindGroupLayout, ...bindGroupLayouts],
+    const bindGroupLayout = cached.bindGroupLayout.get(
+      fragment.bindGroupLayoutEntries
+    );
+    const bindGroup = options.device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: getBindGroupEntries(fragment.resources),
+    });
+
+    this.fragmentResources = {
+      code: fragment.shader,
+      bindGroups: [bindGroup],
+      bindGroupLayouts: [bindGroupLayout],
+    };
+  }
+
+  get bindGroups() {
+    return this.vertexResources.bindGroups.concat(
+      this.fragmentResources.bindGroups
+    );
+  }
+
+  get resources() {
+    return {
+      bindGroupLayouts: this.vertexResources.bindGroupLayouts.concat(
+        this.fragmentResources.bindGroupLayouts
+      ),
+      vertex: this.vertexResources.code,
+      fragment: this.fragmentResources.code,
     };
   }
 
   buildPipeline(options: BuildOptions) {
-    const { vertex, bufferLayout } = this.geometryBuildResult;
-    const { fragment, bindGroupLayouts } = this.materialBuildResult;
+    const { bufferLayout } = this.geometryBuildResult;
+    const { bindGroupLayouts, fragment, vertex } = this.resources;
     const blending = this.material.blendingPreset
       ? getBlendFromPreset(this.material.blendingPreset)
       : this.material.blending;
@@ -391,12 +432,15 @@ export class Mesh<
   build(options: BuildOptions) {
     this.buildOptions = options;
     const device = options.device;
+    /////////////////// 解析 Material /////////////////////////
+    this.buildMaterial(options);
     ///////////// 解析 Geometry ////////////////
     this.buildGeometry(device);
     ///////// 解析自己的组件(组件内部也可以有自己的组件) ///////////
     this.buildComponent(device);
-    /////////////////// 解析 Material /////////////////////////
-    this.buildMaterial(options);
+    /////////////////// 创建 vertex 和 fragment 资源 /////////////////////////
+    this.buildVertexResources(options);
+    this.buildFragmentResources(options);
     /////////////////// 创建 pipeline //////////////////
     this.buildPipeline(options);
   }

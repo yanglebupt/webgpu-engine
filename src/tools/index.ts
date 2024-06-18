@@ -218,7 +218,7 @@ export function injectShaderCode<T extends Record<string, any>>(
             ? Reflect.apply(inject, null, injectContext)
             : inject
         }
-        ${shader.shaderCode.DataDefinition}
+        ${shader.shaderCode.resources ?? ""}
         ${shader.shaderCode.code(context)}
       `;
     },
@@ -232,7 +232,14 @@ export function getAddonBindGroupLayoutEntries(
   startBinding: number = 0,
   resourceViews: Array<GPUResourceView> = []
 ): GPUBindGroupLayoutEntry[] {
-  const defs = makeShaderDataDefinitions(shaderCode.DataDefinition);
+  if (!shaderCode.resources) {
+    if (resourceViews.length > 0)
+      throw new Error(
+        "resource views need empty when shader resources is underfined!"
+      );
+    return [];
+  }
+  const defs = makeShaderDataDefinitions(shaderCode.resources);
   return resourceViews.map((resourceView, idx) => {
     if (resourceView instanceof ResourceBuffer) {
       resourceView.bufferView = makeStructuredView(

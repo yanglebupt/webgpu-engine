@@ -23,10 +23,7 @@ export interface ShaderBuildResult {
 export abstract class Material implements Observable {
   abstract watch: WatchPropertyKey;
   abstract update(device: GPUDevice): void;
-  abstract build(
-    options: BuildOptions,
-    vertexBindingStart?: number
-  ): {
+  abstract build(options: BuildOptions): {
     vertex?: ShaderBuildResult;
     fragment: ShaderBuildResult;
   };

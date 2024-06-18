@@ -1,5 +1,5 @@
 export interface ShaderCode<T = Record<string, any>> {
-  DataDefinition: string;
+  resources?: string;
   code: ShaderModuleCode<T>;
 }
 
@@ -62,11 +62,13 @@ struct EnvUniform {
 @group(0) @binding(5) var envSampler: sampler;
 `;
 
-export const MTransformationMatrixGroupBinding = /* wgsl */ `
+export const MTransformationMatrixGroupBinding = (
+  bindingStart: number
+) => /* wgsl */ `
 struct MTransformation {
   modelMatrix: mat4x4f,
   normalMatrix: mat4x4f,
 };
 
-@group(1) @binding(0) var<storage> ${M_INSTANCE_NAME}: array<MTransformation>;
+@group(1) @binding(${bindingStart}) var<storage> ${M_INSTANCE_NAME}: array<MTransformation>;
 `;

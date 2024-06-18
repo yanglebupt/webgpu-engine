@@ -11,7 +11,7 @@
 import { ShaderCode } from "../../shaders";
 
 const DigitalGlitch: ShaderCode = {
-  DataDefinition: /* wgsl */ `
+  resources: /* wgsl */ `
     struct UniformData {
       byp: u32, //should we apply the glitch ?
       amount: f32,

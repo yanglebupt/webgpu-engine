@@ -1,7 +1,7 @@
 import { ShaderCode } from "../../../../tools/shaders";
 
 const TestFragment: ShaderCode = {
-  DataDefinition: /* wgsl */ `
+  resources: /* wgsl */ `
 struct UniformData {
   li:f32,
 };

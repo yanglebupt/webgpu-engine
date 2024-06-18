@@ -89,7 +89,7 @@ const plane = new Mesh(
     vertex: m_vertex,
     fragment: m_fragment,
     resourceViews: {
-      fragment: [new Uniform("uni", { color: [1, 1, 0, 1] })],
+      vertex: [new Uniform("uni", { color: [1, 1, 0, 1] })],
     },
   })
 );
@@ -98,11 +98,11 @@ scene.add(plane);
 const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);
 
-// const pass = new RenderPass(fragment, [
-//   new Uniform("uni", { li: 0.2 }),
-//   texture,
-// ]);
-// composer.addPass(pass);
+const pass = new RenderPass(fragment, [
+  new Uniform("uni", { li: 0.2 }),
+  texture,
+]);
+composer.addPass(pass);
 
 const pass_2 = new GlitchPass();
 composer.addPass(pass_2);
@@ -142,7 +142,7 @@ gui.add(settings, "stop").onChange((s) => {
 });
 
 gui.add(settings, "li", 0.01, 2).onChange((l) => {
-  // (pass.resourceViews[0] as Uniform).value.li = l;
+  (pass.resourceViews[0] as Uniform).value.li = l;
 });
 
 export function frame() {

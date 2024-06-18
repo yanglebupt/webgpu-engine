@@ -1,4 +1,4 @@
-export const DataDefinitions = /* wgsl */ `
+export const BasicUnifom = /* wgsl */ `
 struct Uniforms {
   color: vec4f,
 } 
@@ -6,7 +6,7 @@ struct Uniforms {
 `;
 
 export default () => /* wgsl */ `
-${DataDefinitions}
+${BasicUnifom}
 @fragment
 fn main() -> @location(0) vec4f {
   return uni.color;

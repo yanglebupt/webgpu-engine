@@ -39,20 +39,15 @@ export interface ShaderMaterial {
 }
 
 export class ShaderMaterial extends MeshMaterial {
-  static InjectVertexShaderCode = /*wgsl*/ `
+  static InjectVertexShaderCode = (bindingStart: number) => /*wgsl*/ `
   ${VPTransformationMatrixGroupBinding}
-  ${MTransformationMatrixGroupBinding}
-  `;
-
-  static InjectFragmentShaderCode = /*wgsl*/ `
-  ${LightGroupBinding}
-  ${EnvMapGroupBinding}
+  ${MTransformationMatrixGroupBinding(bindingStart)}
   `;
 
   private vertex: ShaderCodeWithContext;
   private fragment: ShaderCodeWithContext;
-  private vertexBuildResult: ShaderBuildResult;
-  private fragmentBuildResult: ShaderBuildResult;
+  private vertexBuildResult!: ShaderBuildResult;
+  private fragmentBuildResult!: ShaderBuildResult;
 
   constructor(
     options: Partial<ShaderMaterial> & {
@@ -66,24 +61,6 @@ export class ShaderMaterial extends MeshMaterial {
     this.envmap = options.envmap ?? false;
     this.lighting = options.lighting ?? false;
     this.resourceViews = options.resourceViews;
-
-    this.vertexBuildResult = this.injectShaderCode(
-      this.vertex,
-      ShaderMaterial.InjectVertexShaderCode
-    );
-
-    let fragmentInject = this.envmap
-      ? `
-    ${EnvMapGroupBinding}`
-      : "";
-    fragmentInject += this.lighting
-      ? `
-    ${LightGroupBinding}`
-      : "";
-    this.fragmentBuildResult = this.injectShaderCode(
-      this.fragment,
-      fragmentInject
-    );
   }
 
   contextShaderCode(code: ShaderCodeWithContext | ShaderCode) {
@@ -93,25 +70,13 @@ export class ShaderMaterial extends MeshMaterial {
     return shaderCode;
   }
 
-  injectShaderCode(
-    code: ShaderCodeWithContext,
-    inject: string | Function = "",
-    ...injectContext: any[]
-  ) {
-    return {
-      bindGroupLayoutEntries: [],
-      resources: [],
-      shader: injectShaderCode(code, inject, ...injectContext),
-    };
-  }
-
   update(device: GPUDevice) {
     updateResourceViews(device, this.resourceViews?.vertex);
     updateResourceViews(device, this.resourceViews?.fragment);
   }
 
   buildShader(
-    shaderCode: ShaderCode,
+    shader: ShaderCodeWithContext,
     visibility: GPUShaderStageFlags,
     startBinding: number,
     device: GPUDevice,
@@ -119,7 +84,7 @@ export class ShaderMaterial extends MeshMaterial {
     resourceViews?: Array<GPUResourceView>
   ) {
     const bindGroupLayoutEntries = getAddonBindGroupLayoutEntries(
-      shaderCode,
+      shader.shaderCode,
       visibility,
       startBinding,
       resourceViews
@@ -131,33 +96,46 @@ export class ShaderMaterial extends MeshMaterial {
       resourceViews
     );
 
-    return { bindGroupLayoutEntries, resources };
+    let _shader;
+    if (visibility === GPUShaderStage.FRAGMENT) {
+      let fragmentInject = this.envmap
+        ? `
+    ${EnvMapGroupBinding}`
+        : "";
+      fragmentInject += this.lighting
+        ? `
+    ${LightGroupBinding}`
+        : "";
+      _shader = injectShaderCode(shader, fragmentInject);
+    } else {
+      _shader = injectShaderCode(
+        shader,
+        ShaderMaterial.InjectVertexShaderCode(bindGroupLayoutEntries.length)
+      );
+    }
+
+    return { bindGroupLayoutEntries, resources, shader: _shader };
   }
-  build({ device, cached }: BuildOptions, vertexBindingStart: number) {
+
+  build({ device, cached }: BuildOptions) {
     const { vertex, fragment } = this.resourceViews ?? {};
 
-    Object.assign(
-      this.vertexBuildResult,
-      this.buildShader(
-        this.vertex.shaderCode,
-        GPUShaderStage.VERTEX,
-        vertexBindingStart,
-        device,
-        { sampler: cached.sampler },
-        vertex
-      )
+    this.vertexBuildResult = this.buildShader(
+      this.vertex,
+      GPUShaderStage.VERTEX,
+      0,
+      device,
+      { sampler: cached.sampler },
+      vertex
     );
 
-    Object.assign(
-      this.fragmentBuildResult,
-      this.buildShader(
-        this.fragment.shaderCode,
-        GPUShaderStage.FRAGMENT,
-        0,
-        device,
-        { sampler: cached.sampler },
-        fragment
-      )
+    this.fragmentBuildResult = this.buildShader(
+      this.fragment,
+      GPUShaderStage.FRAGMENT,
+      0,
+      device,
+      { sampler: cached.sampler },
+      fragment
     );
 
     return {

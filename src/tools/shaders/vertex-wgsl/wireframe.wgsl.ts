@@ -10,21 +10,26 @@ import { wgsl } from "wgsl-preprocessor";
 interface ShaderContextParameter {
   useTexcoord: boolean;
   useNormal: boolean;
+  bindingStart: number;
 }
 
 export default (context: ShaderContext<ShaderContextParameter>) => {
+  const { useNormal, useTexcoord, bindingStart = 0 } = context;
+
   return wgsl/* wgsl */ `
 ${VPTransformationMatrixGroupBinding}
-${MTransformationMatrixGroupBinding}
+${MTransformationMatrixGroupBinding(bindingStart)}
 
-@group(1) @binding(1) var<storage, read> positions: array<f32>;
-@group(1) @binding(2) var<storage, read> indices: array<u32>;
+@group(1) @binding(${
+    bindingStart + 1
+  }) var<storage, read> positions: array<f32>;
+@group(1) @binding(${bindingStart + 2}) var<storage, read> indices: array<u32>;
 
-#if ${context.useNormal}
-@group(1) @binding(3) var<storage, read> normals: array<f32>;
+#if ${useNormal}
+@group(1) @binding(${bindingStart + 3}) var<storage, read> normals: array<f32>;
 #endif
-#if ${context.useTexcoord}
-@group(1) @binding(4) var<storage, read> uv0s: array<f32>;
+#if ${useTexcoord}
+@group(1) @binding(${bindingStart + 4}) var<storage, read> uv0s: array<f32>;
 #endif
 
 struct VertexOutput {
@@ -78,12 +83,12 @@ fn main(
     o.pos = pos.xyz/pos.w;
     o.cameraPos = ${VP_NAME}.cameraPosition;
     o.position = ${VP_NAME}.projectionMatrix * ${VP_NAME}.viewMatrix * pos;
-    #if ${context.useNormal}
+    #if ${useNormal}
     o.normal = (modelTransform.normalMatrix * normal).xyz;
     #else
     o.normal = vec3f(0);
     #endif
-    #if ${context.useTexcoord}
+    #if ${useTexcoord}
     o.uv0 = uv0;
     #else
     o.uv0 = vec2f(0);

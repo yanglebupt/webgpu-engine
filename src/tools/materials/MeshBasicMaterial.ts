@@ -1,6 +1,6 @@
 import { Vec4 } from "wgpu-matrix";
 import fragment, {
-  DataDefinitions,
+  BasicUnifom,
 } from "../shaders/fragment-wgsl/mesh/basic.wgsl";
 import {
   ShaderDataDefinitions,
@@ -22,7 +22,7 @@ export class MeshBasicMaterial extends MeshMaterial {
   static defs: ShaderDataDefinitions;
   static {
     try {
-      MeshBasicMaterial.defs = makeShaderDataDefinitions(DataDefinitions);
+      MeshBasicMaterial.defs = makeShaderDataDefinitions(BasicUnifom);
     } catch (error) {}
   }
   private uniformValue: StructuredView;

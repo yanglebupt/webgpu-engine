@@ -1,23 +1,34 @@
-import { wgsl } from "wgsl-preprocessor";
-import { ShaderLocation, ShaderCode } from "../../../tools/shaders";
+import { ShaderCode } from "../../../tools/shaders";
 import { Transform } from "../../../tools/materials/ShaderMaterial";
 
 const vertex: ShaderCode = {
-  DataDefinition: ``,
+  resources: /*wgsl*/ `
+  struct Uniforms {
+  color: vec4f,
+} 
+@group(1) @binding(0) var<uniform> uni: Uniforms;
+`,
   code() {
-    return wgsl/* wgsl */ `
+    return /* wgsl */ `
 struct VertexInput {
-  @location(${ShaderLocation.POSITION}) position: vec4f,
+  @location(0) position: vec4f,
 };
 
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f, 
+}
 
 @vertex
 fn main(
   vert: VertexInput, 
   @builtin(instance_index) instanceIndex : u32
-) -> @builtin(position) vec4f {
+) -> VertexOutput {
     ${Transform}
-    return projectionMatrix * viewMatrix * modelMatrix * vert.position;
+    var o: VertexOutput;
+    o.position = projectionMatrix * viewMatrix * modelMatrix * vert.position;
+    o.color = uni.color;
+    return o;
 };`;
   },
 };
