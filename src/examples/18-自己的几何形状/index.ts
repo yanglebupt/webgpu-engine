@@ -27,13 +27,13 @@ import { ComputePass } from "../../tools/postprocess/ComputePass";
 import { Uniform } from "../../tools/textures/ResourceBuffer";
 import { GlitchPass } from "../../tools/postprocess/GlitchPass";
 import { ShaderMaterial } from "../../tools/materials/ShaderMaterial";
-import m_vertex from "./material/vertex.wgsl";
-import m_fragment from "./material/fragment.wgsl";
+import m_vertex from "./material/vertex.wgssl";
+import m_fragment from "./material/fragment.wgssl";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
   canvasConfig: {
-    config: { virtual: true },
+    config: { virtual: false },
   },
 })
   .checkSupport()
@@ -95,17 +95,17 @@ const plane = new Mesh(
 );
 scene.add(plane);
 
-const texture = await new Texture("/coins.jpg").load();
-const composer = new EffectComposer(scene);
+// const texture = await new Texture("/coins.jpg").load();
+// const composer = new EffectComposer(scene);
 
-const pass = new RenderPass(fragment, [
-  new Uniform("uni", { li: 0.2 }),
-  texture,
-]);
-composer.addPass(pass);
+// const pass = new RenderPass(fragment, [
+//   new Uniform("uni", { li: 0.2 }),
+//   texture,
+// ]);
+// composer.addPass(pass);
 
-const pass_2 = new GlitchPass();
-composer.addPass(pass_2);
+// const pass_2 = new GlitchPass();
+// composer.addPass(pass_2);
 
 const settings = {
   color: [255, 0, 0, 255],
@@ -142,11 +142,11 @@ gui.add(settings, "stop").onChange((s) => {
 });
 
 gui.add(settings, "li", 0.01, 2).onChange((l) => {
-  (pass.resourceViews[0] as Uniform).value.li = l;
+  // (pass.resourceViews[0] as Uniform).value.li = l;
 });
 
 export function frame() {
-  composer.render();
-  // scene.render();
+  // composer.render();
+  scene.render();
   requestAnimationFrame(frame);
 }

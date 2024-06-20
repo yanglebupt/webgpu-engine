@@ -2,10 +2,15 @@ import { makeShaderDataDefinitions, makeStructuredView } from "webgpu-utils";
 import { CreateTextureOptions, getSourceSize, numMipLevels } from "./loader";
 import { bilinearFilter } from "./math";
 import { GPUSamplerCache, GPUShaderModuleCacheKey } from "./scene/cache";
-import { ShaderCode, ShaderContext } from "./shaders";
+import {
+  ShaderCode,
+  ShaderCodeWithContext,
+  ShaderContext,
+  WGSSLPosition,
+} from "./shaders";
 import { GPUResource, GPUResourceView } from "./type";
 import { ResourceBuffer } from "./textures/ResourceBuffer";
-import { BuildOptions, Type } from "./scene/types";
+import { Type } from "./scene/types";
 
 export interface GPUSupport {
   gpu: GPU;
@@ -200,27 +205,57 @@ export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
   return entries;
 }
 
-export type ShaderCodeWithContext = {
-  shaderCode: ShaderCode;
-  context?: ShaderContext;
-};
-
 export function injectShaderCode<T extends Record<string, any>>(
   shader: ShaderCodeWithContext,
-  inject: string | Function,
-  ...injectContext: any[]
+  injections: Array<{
+    inject: string | Function;
+    injectContext?: any[];
+    position?: WGSSLPosition /* 默认是 WGSSLPosition.Global */;
+  }>
 ): GPUShaderModuleCacheKey<T> {
+  const shaderCode = shader.shaderCode;
+  const { Stage, Addon, Return } = shaderCode.Info;
+  const returnFlag =
+    Return === "vec4f"
+      ? Stage === "vertex"
+        ? "@builtin(position) "
+        : "@location(0) "
+      : "";
+  const injects: Map<WGSSLPosition, string[]> = new Map();
+  injections.forEach(
+    ({ position = WGSSLPosition.Global, inject, injectContext }) => {
+      let existInject = injects.get(position);
+      if (!existInject) {
+        existInject = [];
+        injects.set(position, existInject);
+      }
+      existInject.push(
+        typeof inject === "function"
+          ? Reflect.apply(inject, null, injectContext ?? [])
+          : inject
+      );
+    }
+  );
+  const global = `
+${injects.get(WGSSLPosition.Global)?.join("") ?? ""}
+${shaderCode.Resources ?? ""}
+${shaderCode.Global ?? ""}`.trimStart();
+
+  const input = `
+${injects.get(WGSSLPosition.Input)?.join("") ?? ""}
+${shaderCode.Input}`.trimStart();
+
+  const entry = `
+${injects.get(WGSSLPosition.Entry)?.join("") ?? ""}
+${shaderCode.Entry}`.trimStart();
+
   return {
     code: (context: ShaderContext<T>) => {
-      return `
-        ${
-          typeof inject === "function"
-            ? Reflect.apply(inject, null, injectContext)
-            : inject
-        }
-        ${shader.shaderCode.resources ?? ""}
-        ${shader.shaderCode.code(context)}
-      `;
+      return `${global}
+@${Stage} ${Addon.concat(" ")}
+fn main(${input}) -> ${returnFlag}${Return} {
+  ${entry}
+}`.trimStart();
     },
     context: shader.context ?? {},
   };
@@ -232,14 +267,14 @@ export function getAddonBindGroupLayoutEntries(
   startBinding: number = 0,
   resourceViews: Array<GPUResourceView> = []
 ): GPUBindGroupLayoutEntry[] {
-  if (!shaderCode.resources) {
+  if (!shaderCode.Resources) {
     if (resourceViews.length > 0)
       throw new Error(
         "resource views need empty when shader resources is underfined!"
       );
     return [];
   }
-  const defs = makeShaderDataDefinitions(shaderCode.resources);
+  const defs = makeShaderDataDefinitions(shaderCode.Resources);
   return resourceViews.map((resourceView, idx) => {
     if (resourceView instanceof ResourceBuffer) {
       resourceView.bufferView = makeStructuredView(

@@ -1,7 +1,30 @@
-export interface ShaderCode<T = Record<string, any>> {
-  resources?: string;
-  code: ShaderModuleCode<T>;
+/**
+ * 受限于技术能力，无法对完整的 wgsl 进行语法分析-转换-生成
+ * 因此现在只能将 shader 的各个部分拆开，然后注入，再重组
+ */
+export interface ShaderCode {
+  Input: string;
+  Resources?: string;
+  Global?: string;
+  Entry: string;
+  Info: {
+    Stage: "vertex" | "fragment" | "compute";
+    Return: string;
+    Addon: string[];
+  };
 }
+
+export enum WGSSLPosition {
+  Input,
+  Resources,
+  Global,
+  Entry,
+}
+
+export type ShaderCodeWithContext = {
+  shaderCode: ShaderCode;
+  context?: ShaderContext;
+};
 
 export enum ShaderLocation {
   POSITION = 0,

@@ -5,13 +5,14 @@ import {
   MTransformationMatrixGroupBinding,
   M_INSTANCE_NAME,
   ShaderCode,
+  ShaderCodeWithContext,
   VPTransformationMatrixGroupBinding,
   VP_NAME,
+  WGSSLPosition,
 } from "../shaders";
 import { GPUResourceView } from "../type";
 import { MeshMaterial } from "./MeshMaterial";
 import {
-  ShaderCodeWithContext,
   getAddonBindGroupLayoutEntries,
   getResourcesfromViews,
   injectShaderCode,
@@ -21,10 +22,11 @@ import { ShaderBuildResult } from "./Material";
 import { GPUSamplerCache } from "../scene/cache";
 
 // need inject in main function
-export const Transform = /*wgsl*/ `
+const defaultInstanceName = "instanceIndex";
+const Transform = (instanceName: string = defaultInstanceName) => /*wgsl*/ `
 let projectionMatrix = ${VP_NAME}.projectionMatrix;
 let viewMatrix = ${VP_NAME}.viewMatrix;
-let modelTransform = ${M_INSTANCE_NAME}[instanceIndex];
+let modelTransform = ${M_INSTANCE_NAME}[${instanceName}];
 let modelMatrix = modelTransform.modelMatrix;
 let normalMatrix = modelTransform.normalMatrix;`;
 
@@ -39,10 +41,10 @@ export interface ShaderMaterial {
 }
 
 export class ShaderMaterial extends MeshMaterial {
-  static InjectVertexShaderCode = (bindingStart: number) => /*wgsl*/ `
-  ${VPTransformationMatrixGroupBinding}
-  ${MTransformationMatrixGroupBinding(bindingStart)}
-  `;
+  static InjectVertexShaderCode = (
+    bindingStart: number
+  ) => /*wgsl*/ `${VPTransformationMatrixGroupBinding}
+${MTransformationMatrixGroupBinding(bindingStart)}`;
 
   private vertex: ShaderCodeWithContext;
   private fragment: ShaderCodeWithContext;
@@ -98,20 +100,39 @@ export class ShaderMaterial extends MeshMaterial {
 
     let _shader;
     if (visibility === GPUShaderStage.FRAGMENT) {
-      let fragmentInject = this.envmap
-        ? `
-    ${EnvMapGroupBinding}`
-        : "";
-      fragmentInject += this.lighting
-        ? `
-    ${LightGroupBinding}`
-        : "";
-      _shader = injectShaderCode(shader, fragmentInject);
+      const injects = [];
+      if (this.envmap)
+        injects.push({
+          inject: EnvMapGroupBinding,
+        });
+      if (this.lighting)
+        injects.push({
+          inject: LightGroupBinding,
+        });
+      _shader = injectShaderCode(shader, injects);
     } else {
-      _shader = injectShaderCode(
-        shader,
-        ShaderMaterial.InjectVertexShaderCode(bindGroupLayoutEntries.length)
-      );
+      // 需要检测是否已经存在 instanceFlag
+      const input = shader.shaderCode.Input;
+      const matched = input.match(/@builtin\(instance_index\)\s*(.*?)\s*:/);
+      const instanceName = matched ? matched[1] : defaultInstanceName;
+      const injects = [
+        {
+          inject: ShaderMaterial.InjectVertexShaderCode(
+            bindGroupLayoutEntries.length
+          ),
+        },
+        {
+          inject: Transform(instanceName),
+          position: WGSSLPosition.Entry,
+        },
+      ];
+      if (!matched) {
+        injects.push({
+          inject: `@builtin(instance_index) ${defaultInstanceName}: u32,`,
+          position: WGSSLPosition.Input,
+        });
+      }
+      _shader = injectShaderCode(shader, injects);
     }
 
     return { bindGroupLayoutEntries, resources, shader: _shader };

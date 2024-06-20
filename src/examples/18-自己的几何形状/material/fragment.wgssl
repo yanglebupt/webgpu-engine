@@ -1,0 +1,9 @@
+Input { 
+  @location(0) color: vec4f, 
+}
+
+@fragment
+@return vec4f
+Entry {
+  return color;
+}

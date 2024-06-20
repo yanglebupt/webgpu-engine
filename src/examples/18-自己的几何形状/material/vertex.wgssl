@@ -1,0 +1,27 @@
+Input { 
+  @location(0) position: vec4f, 
+}
+
+Resources { 
+  struct Uniforms { 
+    color: vec4f, 
+  };
+
+  @group(1) @binding(0) var<uniform> uni: Uniforms;
+}
+
+Global {
+  struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) color: vec4f, 
+  }
+}
+
+@vertex 
+@return VertexOutput
+Entry {
+  var o: VertexOutput;
+  o.position = projectionMatrix * viewMatrix * modelMatrix * position;
+  o.color = uni.color;
+  return o;
+}
