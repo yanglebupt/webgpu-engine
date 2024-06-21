@@ -1,12 +1,11 @@
 import { BuildOptions } from "../scene/types";
 import { GPUResource, GPUResourceView } from "../type";
 import {
-  ShaderCodeWithContext,
   getAddonBindGroupLayoutEntries,
   getResourcesfromViews,
   updateResourceViews,
 } from "..";
-import { ShaderCode } from "../shaders";
+import { ShaderCode, ShaderCodeWithContext } from "../shaders";
 
 export abstract class Pass<
   P extends GPURenderPipeline | GPUComputePipeline =

@@ -1,10 +1,6 @@
-import {
-  ShaderCodeWithContext,
-  getBindGroupEntries,
-  injectShaderCode,
-} from "..";
+import { getBindGroupEntries, injectShaderCode } from "..";
 import { BuildOptions } from "../scene/types";
-import { ShaderCode } from "../shaders";
+import { ShaderCode, ShaderCodeWithContext } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/full-plane.wgsl";
 import { GPUResourceView } from "../type";
 import { Pass } from "./Pass";
@@ -86,7 +82,9 @@ export class RenderPass extends Pass<GPURenderPipeline> {
 
     this.pipeline = cached.pipeline.get(
       { code: vertex, context: { flipY: true } },
-      injectShaderCode(this.shaderCode, RenderPass.InjectShaderCode),
+      injectShaderCode(this.shaderCode, [
+        { inject: RenderPass.InjectShaderCode },
+      ]),
       {
         format,
         primitive: { topology: "triangle-list" },

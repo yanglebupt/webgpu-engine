@@ -26,9 +26,11 @@ export default function WGSSLPlugin(): Plugin {
           res = res.replace(new RegExp(`${section}\\s*\{`), "");
           result[section] = res.replace(/}\s*$/, "").trim().trim();
         };
+
         lines.forEach((line, idx) => {
           const trimmedLine = line.trim();
           const findKeyWord = keywords.find((k) => trimmedLine.startsWith(k));
+          // TODO： 需要清除注释
           if (findKeyWord) {
             keyword && clear(keyword);
             result[findKeyWord] = line;

@@ -2,7 +2,7 @@ import { rand, randFloat, randInt } from "../math";
 import { DataTexture } from "../textures/DataTexture";
 import { Uniform } from "../textures/ResourceBuffer";
 import { RenderPass } from "./RenderPass";
-import DigitalGlitch from "./shaders/DigitalGlitch.wgsl";
+import DigitalGlitch from "./shaders/DigitalGlitch.wgssl";
 
 function generateHeightmap(dt_size: number) {
   const length = dt_size * dt_size;

@@ -1,5 +1,4 @@
 import {
-  ShaderCodeWithContext,
   createComputePipeline,
   getBindGroupEntries,
   injectShaderCode,
@@ -7,7 +6,7 @@ import {
 import { Logger } from "../helper";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions } from "../scene/types";
-import { ShaderCode, ShaderContext } from "../shaders";
+import { ShaderCode, ShaderCodeWithContext, ShaderContext } from "../shaders";
 import { GPUResourceView } from "../type";
 import { DispatchCompute, axis } from "../utils/Dispatch";
 import { Pass } from "./Pass";
@@ -133,8 +132,7 @@ export class ComputePass extends Pass<GPUComputePipeline> {
         shaderCode: this.shaderCode.shaderCode,
         context: { chunkSize, order, ...this.shaderCode.context },
       },
-      ComputePass.InjectShaderCode,
-      format
+      [{ inject: ComputePass.InjectShaderCode, injectContext: [format] }]
     );
 
     let codeStr = compute.code(compute.context);
