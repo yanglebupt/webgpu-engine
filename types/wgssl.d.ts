@@ -6,7 +6,7 @@ declare module "*.wgssl" {
     Entry: string;
     Info: {
       Stage: "vertex" | "fragment" | "compute";
-      Return: string;
+      Return?: string;
       Addon: string[];
     };
   }

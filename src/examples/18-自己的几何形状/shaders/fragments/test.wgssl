@@ -6,8 +6,8 @@ Resources {
   struct UniformData {
     li:f32,
   };
-  @group(0) @binding(2) var<uniform> uni: UniformData;
-  @group(0) @binding(3) var tex: texture_2d<f32>;
+  @group(0) @binding(0) var<uniform> uni: UniformData;
+  @group(0) @binding(1) var tex: texture_2d<f32>;
 }
 
 @fragment

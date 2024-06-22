@@ -98,7 +98,11 @@ scene.add(plane);
 const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);
 
-const pass = new RenderPass(fragment, [
+// const pass = new RenderPass(fragment, [
+//   new Uniform("uni", { li: 0.2 }),
+//   texture,
+// ]);
+const pass = new ComputePass(compute, [
   new Uniform("uni", { li: 0.2 }),
   texture,
 ]);

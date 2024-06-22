@@ -9,7 +9,7 @@ export interface ShaderCode {
   Entry: string;
   Info: {
     Stage: "vertex" | "fragment" | "compute";
-    Return: string;
+    Return?: string;
     Addon: string[];
   };
 }
@@ -19,6 +19,7 @@ export enum WGSSLPosition {
   Resources,
   Global,
   Entry,
+  Addon,
 }
 
 export type ShaderCodeWithContext = {

@@ -4,6 +4,7 @@ const fileRegex = /\.wgssl$/;
 const keywords = ["Input", "Resources", "Global", "Entry"];
 const stages = ["vertex", "fragment", "compute"];
 const _return = "return";
+const comment_line = "//";
 
 export default function WGSSLPlugin(): Plugin {
   return {
@@ -16,7 +17,6 @@ export default function WGSSLPlugin(): Plugin {
         const result = {
           Info: {
             Stage: "",
-            Return: "",
             Addon: [] as string[],
           },
         };
@@ -24,13 +24,16 @@ export default function WGSSLPlugin(): Plugin {
         const clear = (section: string) => {
           let res = result[section].trim() as string;
           res = res.replace(new RegExp(`${section}\\s*\{`), "");
-          result[section] = res.replace(/}\s*$/, "").trim().trim();
+          // 清除块间注释
+          result[section] = res
+            .replace(/}[^}]*$/, "")
+            .trim()
+            .trim();
         };
 
         lines.forEach((line, idx) => {
           const trimmedLine = line.trim();
           const findKeyWord = keywords.find((k) => trimmedLine.startsWith(k));
-          // TODO： 需要清除注释
           if (findKeyWord) {
             keyword && clear(keyword);
             result[findKeyWord] = line;
@@ -39,7 +42,11 @@ export default function WGSSLPlugin(): Plugin {
             if (line.startsWith("@")) {
               info += line.trim();
             } else {
-              result[keyword] += line.trim();
+              // 清除行、行间注释
+              result[keyword] += line
+                .replace(/\/\/([\s\S]*)$/, "")
+                .replace(/\/\*([\s\S]*)\*\//, "")
+                .trim();
             }
           }
           idx == lines.length - 1 && keyword && clear(keyword);
@@ -49,7 +56,7 @@ export default function WGSSLPlugin(): Plugin {
           const ti = i.trim();
           if (stages.includes(ti)) result.Info.Stage = ti;
           else if (ti.includes(_return))
-            result.Info.Return = ti.split(/\s+/)[1];
+            result.Info["Return"] = ti.split(/\s+/)[1];
           else if (ti) result.Info.Addon.push(`@${ti}`);
         });
 

@@ -6,11 +6,10 @@ import { GPUResourceView } from "../type";
 import { Pass } from "./Pass";
 
 export class RenderPass extends Pass<GPURenderPipeline> {
-  static InjectShaderCode = /*wgsl*/ `
-@group(0) @binding(0) var inputTexture: texture_2d<f32>;
-@group(0) @binding(1) var _sampler: sampler;
+  static InjectShaderCode = (bindingStart: number) => /*wgsl*/ `
+@group(0) @binding(${bindingStart}) var _sampler: sampler;
+@group(0) @binding(${bindingStart + 1}) var inputTexture: texture_2d<f32>;
 `;
-  static startBinding = 2;
 
   constructor(
     fragment: ShaderCodeWithContext,
@@ -22,12 +21,7 @@ export class RenderPass extends Pass<GPURenderPipeline> {
     // 自定义资源
     resourceViews: Array<GPUResourceView> = []
   ) {
-    super(
-      fragment,
-      GPUShaderStage.FRAGMENT,
-      RenderPass.startBinding,
-      resourceViews
-    );
+    super(fragment, GPUShaderStage.FRAGMENT, resourceViews);
   }
 
   render(device: GPUDevice, encoder: GPUCommandEncoder, texture: GPUTexture) {
@@ -35,7 +29,7 @@ export class RenderPass extends Pass<GPURenderPipeline> {
 
     const bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
-      entries: getBindGroupEntries([texture.createView()], this.resources),
+      entries: getBindGroupEntries(this.resources, [texture.createView()]),
     });
 
     const pass = encoder.beginRenderPass({
@@ -62,28 +56,29 @@ export class RenderPass extends Pass<GPURenderPipeline> {
       usage: descriptor.usage | GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
+    const bindingStart = this.addonBindGroupLayoutEntries.length;
     const bindGroupLayout = cached.bindGroupLayout.get([
+      ...this.addonBindGroupLayoutEntries,
       {
-        binding: 0,
+        binding: bindingStart,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: { type: "filtering" },
+      },
+      {
+        binding: bindingStart + 1,
         visibility: GPUShaderStage.FRAGMENT,
         texture: {
           viewDimension: "2d",
         },
       },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: "filtering" },
-      },
-      ...this.addonBindGroupLayoutEntries,
     ]);
 
-    this.resources.unshift(cached.sampler.default);
+    this.resources.push(cached.sampler.default);
 
     this.pipeline = cached.pipeline.get(
       { code: vertex, context: { flipY: true } },
       injectShaderCode(this.shaderCode, [
-        { inject: RenderPass.InjectShaderCode },
+        { inject: RenderPass.InjectShaderCode(bindingStart) },
       ]),
       {
         format,

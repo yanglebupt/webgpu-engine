@@ -20,7 +20,6 @@ export abstract class Pass<
   constructor(
     code: ShaderCodeWithContext | ShaderCode,
     visibility: GPUShaderStageFlags,
-    startBinding: number = 0,
     // 自定义资源
     public resourceViews: Array<GPUResourceView> = []
   ) {
@@ -32,7 +31,7 @@ export abstract class Pass<
     this.addonBindGroupLayoutEntries = getAddonBindGroupLayoutEntries(
       shaderCode.shaderCode,
       visibility,
-      startBinding,
+      0,
       resourceViews
     );
   }

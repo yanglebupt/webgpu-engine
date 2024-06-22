@@ -204,14 +204,14 @@ export function getBindGroupEntries(...resourcesList: Array<GPUResource[]>) {
   }
   return entries;
 }
-
+export type InjectShaderOption = {
+  inject: string | Function;
+  injectContext?: any[];
+  position?: WGSSLPosition /* 默认是 WGSSLPosition.Global */;
+};
 export function injectShaderCode<T extends Record<string, any>>(
   shader: ShaderCodeWithContext,
-  injections: Array<{
-    inject: string | Function;
-    injectContext?: any[];
-    position?: WGSSLPosition /* 默认是 WGSSLPosition.Global */;
-  }>
+  injections: Array<InjectShaderOption>
 ): GPUShaderModuleCacheKey<T> {
   const shaderCode = shader.shaderCode;
   const { Stage, Addon, Return } = shaderCode.Info;
@@ -221,6 +221,7 @@ export function injectShaderCode<T extends Record<string, any>>(
         ? "@builtin(position) "
         : "@location(0) "
       : "";
+  const _return = Return !== undefined ? `-> ${returnFlag}${Return}` : "";
   const injects: Map<WGSSLPosition, string[]> = new Map();
   injections.forEach(
     ({ position = WGSSLPosition.Global, inject, injectContext }) => {
@@ -249,11 +250,13 @@ ${shaderCode.Input}`.trimStart();
 ${injects.get(WGSSLPosition.Entry)?.join("") ?? ""}
 ${shaderCode.Entry}`.trimStart();
 
+  const addon = Addon.concat(injects.get(WGSSLPosition.Addon) ?? []).join(" ");
+
   return {
     code: (context: ShaderContext<T>) => {
       return `${global}
-@${Stage} ${Addon.concat(" ")}
-fn main(${input}) -> ${returnFlag}${Return} {
+@${Stage} ${addon}
+fn main(${input})${_return}{
   ${entry}
 }`.trimStart();
     },

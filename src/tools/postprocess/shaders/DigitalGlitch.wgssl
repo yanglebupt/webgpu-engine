@@ -15,7 +15,7 @@ Input {
 
 Resources {
   struct UniformData {
-    byp: u32, 
+    byp: u32,  //should we apply the glitch ?
     amount: f32,
     angle: f32,
     seed: f32,
@@ -25,18 +25,19 @@ Resources {
     distortion_y: f32,
     col_s: f32,
   };
-  @group(0) @binding(2) var<uniform> uni: UniformData;
-  @group(0) @binding(3) var tDisp: texture_2d<f32>;
+  @group(0) @binding(0) var<uniform> uni: UniformData;
+  @group(0) @binding(1) var tDisp: texture_2d<f32>;
 }
+
 
 Global {
   fn texture2D(texture: texture_2d<f32>, uv: vec2f) -> vec4f {
     return textureSample(texture, _sampler, uv);
-  };
+  }
 
   fn rand(co: vec2f) -> f32 {
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-  };
+  }
 }
 
 @fragment
@@ -49,7 +50,7 @@ Entry {
     let seed=uni.seed;
     let seed_x=uni.seed_x;
     let seed_y=uni.seed_y;
-    let distortion_x=uni.distortion_x;
+    let distortion_x=/*hello*/uni.distortion_x;
     let distortion_y=uni.distortion_y;
     let col_s=uni.col_s;
 
@@ -57,6 +58,7 @@ Entry {
 
     let xs = floor(position.x / 0.5);
     let ys = floor(position.y / 0.5);
+    //based on staffantans glitch shader for unity https://github.com/staffantan/unityglitch
     let disp = texture2D(tDisp, p*seed*seed).r;
     if(p.y<distortion_x+col_s && p.y>distortion_x-col_s*seed) {
       if(seed_x>0.){
@@ -76,11 +78,13 @@ Entry {
     }
     p.x+=disp*seed_x*(seed/5.);
     p.y+=disp*seed_y*(seed/5.);
+    //base from RGB shift shader
     let offset = amount * vec2f( cos(angle), sin(angle));
     let cr = texture2D(inputTexture, p + offset);
     let cga = texture2D(inputTexture, p);
     let cb = texture2D(inputTexture, p - offset);
     var col = vec4f(cr.r, cga.g, cb.b, cga.a);
+    //add noise
     let snow = 200.*amount*vec4(rand(vec2f(xs * seed,ys * seed*50.))*0.2);
     col += snow;
     return col;
