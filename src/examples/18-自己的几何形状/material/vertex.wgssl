@@ -1,15 +1,17 @@
+// Entry 的输入参数 
 Input { 
   @location(0) position: vec4f, 
 }
 
+// Shader 需要的外部资源，uniform storage texture sampler... 
 Resources { 
   struct Uniforms { 
     color: vec4f, 
   };
-
   @group(1) @binding(0) var<uniform> uni: Uniforms;
 }
 
+// 全局块下，可以用来定义一些数据结构和函数，然后在 Entry 中使用
 Global {
   struct VertexOutput {
     @builtin(position) position: vec4f,

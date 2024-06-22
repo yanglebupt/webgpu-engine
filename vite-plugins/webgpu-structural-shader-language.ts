@@ -12,14 +12,19 @@ export default function WGSSLPlugin(): Plugin {
     transform(src, id) {
       if (fileRegex.test(id)) {
         const lines = src.split("\n");
+
         let info = "";
+        let define = "";
+        let keyword: string | undefined;
+
         const result = {
+          Define: {},
           Info: {
             Stage: "",
             Addon: [] as string[],
           },
         };
-        let keyword: string | undefined;
+
         const clear = (section: string) => {
           let res = result[section].trim() as string;
           res = res.replace(new RegExp(`${section}\\s*\{`), "");
@@ -37,18 +42,18 @@ export default function WGSSLPlugin(): Plugin {
             keyword && clear(keyword);
             result[findKeyWord] = line;
             keyword = findKeyWord;
+          } else if (line.startsWith("@")) {
+            info += trimmedLine;
+          } else if (line.startsWith("#")) {
+            define += trimmedLine;
           } else if (keyword) {
-            if (line.startsWith("@")) {
-              info += line.trim();
-            } else {
-              // 清除行、行间注释
-              result[keyword] +=
-                /* 防止一些标记和变量挨在一起，分不出来 */ " " +
-                line
-                  .replace(/\/\/([\s\S]*)$/, "")
-                  .replace(/\/\*([\s\S]*)\*\//, "")
-                  .trim();
-            }
+            // 清除行、行间注释
+            result[keyword] +=
+              /* 防止一些标记和变量挨在一起，分不出来 */ " " +
+              line
+                .replace(/\/\/([\s\S]*)$/, "")
+                .replace(/\/\*([\s\S]*)\*\//, "")
+                .trim();
           }
           idx == lines.length - 1 && keyword && clear(keyword);
         });
@@ -59,6 +64,14 @@ export default function WGSSLPlugin(): Plugin {
           else if (ti.includes(_return))
             result.Info["Return"] = ti.split(/\s+/)[1];
           else if (ti) result.Info.Addon.push(`@${ti}`);
+        });
+
+        define.split("#define").forEach((i) => {
+          const ti = i.trim();
+          if (ti) {
+            const [key, value] = ti.split(" ");
+            result.Define[key] = value;
+          }
         });
 
         return `export default ${JSON.stringify(result)}`;

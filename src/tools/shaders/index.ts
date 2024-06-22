@@ -7,6 +7,7 @@ export interface ShaderCode {
   Resources?: string;
   Global?: string;
   Context?: string;
+  Define: Record<string, any>;
   Entry: string;
   Info: {
     Stage: "vertex" | "fragment" | "compute";

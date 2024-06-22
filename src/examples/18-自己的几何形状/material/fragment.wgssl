@@ -1,7 +1,10 @@
+#define DEFAULT_COLOR vec4f(1.0)  // 宏定义
+
 Input { 
   @location(0) color: vec4f, 
 }
 
+// 用来处理 shader variant 的 shader 上下文，用户可以设置不同的上下文，来得到不同的 shader
 Context {
   useDefault: bool
 }
@@ -10,7 +13,7 @@ Context {
 @return vec4f
 Entry {
   #if ${useDefault}
-  return vec4f(1.0);
+  return ${DEFAULT_COLOR};
   #else
   return color;
   #endif

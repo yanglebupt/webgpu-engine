@@ -229,8 +229,9 @@ export function injectShaderCode<T extends Record<string, any>>(
   shader: ShaderCodeWithContext,
   injections: Array<InjectShaderOption>
 ): GPUShaderModuleCacheKey<T> {
-  const { shaderCode, context = {} } = shader;
+  const { shaderCode, context: _context = {} } = shader;
   const { Stage, Addon, Return } = shaderCode.Info;
+  const contextAndDefine = { ..._context, ...shaderCode.Define };
   const returnFlag =
     Return === "vec4f"
       ? Stage === "vertex"
@@ -255,16 +256,18 @@ export function injectShaderCode<T extends Record<string, any>>(
   );
   const global = `
 ${injects.get(WGSSLPosition.Global)?.join("") ?? ""}
-${parseWGSSLWithContext(shaderCode.Resources, context) ?? ""}
-${parseWGSSLWithContext(shaderCode.Global, context) ?? ""}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Resources, contextAndDefine) ?? ""}
+${
+  parseWGSSLWithContext(shaderCode.Global, contextAndDefine) ?? ""
+}`.trimStart();
 
   const input = `
 ${injects.get(WGSSLPosition.Input)?.join("") ?? ""}
-${parseWGSSLWithContext(shaderCode.Input, context)}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Input, contextAndDefine)}`.trimStart();
 
   const entry = `
 ${injects.get(WGSSLPosition.Entry)?.join("") ?? ""}
-${parseWGSSLWithContext(shaderCode.Entry, context)}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Entry, contextAndDefine)}`.trimStart();
 
   const addon = Addon.concat(injects.get(WGSSLPosition.Addon) ?? []).join(" ");
 
@@ -276,7 +279,7 @@ fn main(${input})${_return}{
   ${entry}
 }`.trimStart();
     },
-    context: context,
+    context: _context,
   };
 }
 
