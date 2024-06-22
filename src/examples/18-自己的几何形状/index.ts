@@ -32,9 +32,7 @@ import m_fragment from "./material/fragment.wgssl";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
-  canvasConfig: {
-    config: { virtual: false },
-  },
+  canvasConfig: { config: { virtual: true } },
 })
   .checkSupport()
   .catch(({ message }) => {
@@ -87,7 +85,7 @@ const plane = new Mesh(
   new PlaneGeometry({ width: 2, height: 2 }),
   new ShaderMaterial({
     vertex: m_vertex,
-    fragment: m_fragment,
+    fragment: { shaderCode: m_fragment, context: { useDefault: false } },
     resourceViews: {
       vertex: [new Uniform("uni", { color: [1, 1, 0, 1] })],
     },
@@ -98,14 +96,16 @@ scene.add(plane);
 const texture = await new Texture("/coins.jpg").load();
 const composer = new EffectComposer(scene);
 
-// const pass = new RenderPass(fragment, [
-//   new Uniform("uni", { li: 0.2 }),
-//   texture,
-// ]);
-const pass = new ComputePass(compute, [
+const pass = new RenderPass(fragment, [
   new Uniform("uni", { li: 0.2 }),
   texture,
 ]);
+
+// const pass = new ComputePass(compute, [
+//   new Uniform("uni", { li: 0.2 }),
+//   texture,
+// ]);
+
 composer.addPass(pass);
 
 const pass_2 = new GlitchPass();

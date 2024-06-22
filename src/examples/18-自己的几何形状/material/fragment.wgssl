@@ -2,8 +2,16 @@ Input {
   @location(0) color: vec4f, 
 }
 
+Context {
+  useDefault: bool
+}
+
 @fragment
 @return vec4f
 Entry {
+  #if ${useDefault}
+  return vec4f(1.0);
+  #else
   return color;
+  #endif
 }

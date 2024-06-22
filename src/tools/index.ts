@@ -6,11 +6,13 @@ import {
   ShaderCode,
   ShaderCodeWithContext,
   ShaderContext,
+  ShaderLocation,
   WGSSLPosition,
 } from "./shaders";
 import { GPUResource, GPUResourceView } from "./type";
 import { ResourceBuffer } from "./textures/ResourceBuffer";
 import { Type } from "./scene/types";
+import { wgsl } from "wgsl-preprocessor";
 
 export interface GPUSupport {
   gpu: GPU;
@@ -209,11 +211,25 @@ export type InjectShaderOption = {
   injectContext?: any[];
   position?: WGSSLPosition /* 默认是 WGSSLPosition.Global */;
 };
+export function parseWGSSLWithContext(
+  wgsslStr: string | undefined,
+  context: ShaderContext
+): string | undefined {
+  if (wgsslStr === undefined) return undefined;
+  // 展开 context
+  const obj = { ...context, wgsl } as Record<string, any>;
+  const cKeys = Object.keys(obj);
+  const cValues = cKeys.map((k) => obj[k]);
+  return Function(
+    cKeys.join(","),
+    `"use strict";return wgsl\`${wgsslStr}\`;`
+  )(...cValues);
+}
 export function injectShaderCode<T extends Record<string, any>>(
   shader: ShaderCodeWithContext,
   injections: Array<InjectShaderOption>
 ): GPUShaderModuleCacheKey<T> {
-  const shaderCode = shader.shaderCode;
+  const { shaderCode, context = {} } = shader;
   const { Stage, Addon, Return } = shaderCode.Info;
   const returnFlag =
     Return === "vec4f"
@@ -239,16 +255,16 @@ export function injectShaderCode<T extends Record<string, any>>(
   );
   const global = `
 ${injects.get(WGSSLPosition.Global)?.join("") ?? ""}
-${shaderCode.Resources ?? ""}
-${shaderCode.Global ?? ""}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Resources, context) ?? ""}
+${parseWGSSLWithContext(shaderCode.Global, context) ?? ""}`.trimStart();
 
   const input = `
 ${injects.get(WGSSLPosition.Input)?.join("") ?? ""}
-${shaderCode.Input}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Input, context)}`.trimStart();
 
   const entry = `
 ${injects.get(WGSSLPosition.Entry)?.join("") ?? ""}
-${shaderCode.Entry}`.trimStart();
+${parseWGSSLWithContext(shaderCode.Entry, context)}`.trimStart();
 
   const addon = Addon.concat(injects.get(WGSSLPosition.Addon) ?? []).join(" ");
 
@@ -260,7 +276,7 @@ fn main(${input})${_return}{
   ${entry}
 }`.trimStart();
     },
-    context: shader.context ?? {},
+    context: context,
   };
 }
 

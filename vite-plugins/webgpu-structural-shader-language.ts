@@ -1,10 +1,9 @@
 import { Plugin } from "vite";
 
 const fileRegex = /\.wgssl$/;
-const keywords = ["Input", "Resources", "Global", "Entry"];
+const keywords = ["Input", "Resources", "Global", "Entry", "Context"];
 const stages = ["vertex", "fragment", "compute"];
 const _return = "return";
-const comment_line = "//";
 
 export default function WGSSLPlugin(): Plugin {
   return {
@@ -43,10 +42,12 @@ export default function WGSSLPlugin(): Plugin {
               info += line.trim();
             } else {
               // 清除行、行间注释
-              result[keyword] += line
-                .replace(/\/\/([\s\S]*)$/, "")
-                .replace(/\/\*([\s\S]*)\*\//, "")
-                .trim();
+              result[keyword] +=
+                /* 防止一些标记和变量挨在一起，分不出来 */ " " +
+                line
+                  .replace(/\/\/([\s\S]*)$/, "")
+                  .replace(/\/\*([\s\S]*)\*\//, "")
+                  .trim();
             }
           }
           idx == lines.length - 1 && keyword && clear(keyword);

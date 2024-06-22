@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 配置内容安全策略（开启 eval 和 Function） https://blog.csdn.net/gao_zhennan/article/details/126006827 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';"
+    />
     <title>Web GPU Learn</title>
     <style>
       html,

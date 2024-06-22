@@ -115,7 +115,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
   }
 
-  build({ device, cached }: BuildOptions) {
+  build({ device, cached, scene }: BuildOptions) {
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
         binding: 0,
@@ -157,7 +157,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
         shader: {
           code: fragment,
           context: {
-            polyfill: false,
+            polyfill: scene.polyfill,
             useAlphaCutoff: this.useAlphaCutoff,
           },
         },

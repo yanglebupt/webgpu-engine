@@ -68,7 +68,7 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
   contextShaderCode(code: ShaderCodeWithContext | ShaderCode) {
     const shaderCode = Object.hasOwn(code, "context")
       ? (code as ShaderCodeWithContext)
-      : { shaderCode: code as ShaderCode, context: {} };
+      : { shaderCode: code as ShaderCode };
     return shaderCode;
   }
 

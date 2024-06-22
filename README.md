@@ -19,7 +19,7 @@ https://toji.dev/webgpu-gltf-case-study/
 - <a href="https://google.github.io/tour-of-wgsl/">tour-of-wgsl</a>
 - <a href="https://www.w3.org/TR/WGSL/">w3c-wgsl</a>
 
-# 主要封装
+# 主要封装 (Updating，最新的内容还未更新)
 
 主要封装的工具都在 <a href="./src/tools/">tools</a> 目录下，其中核心封装有（其他库没有的）
 
@@ -100,26 +100,43 @@ async function frame() {
 }
 ```
 
-## 加载效果截图
+### 加载效果截图
 
 项目地址：https://yanglebupt.github.io/webgpu-engine/ 由于默认加载线上模型，请求模型并下载需要一定时间，一旦请求完成，模型放入浏览器缓存后，渲染很快的
 
 ![](./public/assets/gltf-loader.png)
 ![](./public/assets/IBL-IS.png)
 
+## 几何、材质、屏幕后处理
 
-## 框架说明
+\>>> 框架的基本使用参考 <a href="./src/examples/18-自己的几何形状/">自己的几何形状</a>，实现了以下功能
+
+- 现在已经支持基本几何(线框)、材质(自定义shader材质和自带pbr材质)、屏幕后处理(renderPass和computePass)了!!
+
+- 对于 wgsl ，为了更好的注入和解析，定义了结构化的 webgpu shader 格式，简称 `.wgssl`，开发了对应 vite 插件进行解析!! 并且 wgssl 支持 注释 和 shader variant（通过 context 和 wgsl-preprocessor）
+
+- 完成了 实体-组件 架构 
+
+### wgssl
+
+![](./public/assets/wgssl.png)
+
+### 效果视频
+
+<video src="./public/assets/g-m-p.mp4" controls>
+
+# 框架说明
 
 \>>> 设计文档 飞书 Docs Link: https://qwuzvjx4mo.feishu.cn/drive/folder/TMj3fNBnFlRqNjdpPF0ch8XHnqH Password: 54@T9451 
 
 API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material 可以直接从 threejs 源码中拷贝过来就可以用
 
-## 目前困惑
+# 目前困惑
 
 - alphaMode premultiplied 对于颜色该怎么处理，是在 shader 中弄还是外面直接对颜色处理
 - PostProcess 和 ShaderMaterial 涉及到 shader 代码注入，没法命中缓存。目前 compute pipeline 没有设置缓存
 
-## TODO
+# TODO
 
 文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
 
