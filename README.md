@@ -123,7 +123,7 @@ async function frame() {
 
 ### 效果视频
 
-<video src="./public/assets/g-m-p.mp4" controls>
+<video src="./public/assets/g-m-p.mp4" controls></video>
 
 # 框架说明
 
