@@ -123,7 +123,7 @@ async function frame() {
 
 ### 效果视频
 
-<video src="./public/assets/g-m-p.mp4" controls></video>
+<iframe width="1920" height="1080" src="./public/assets/g-m-p.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 # 框架说明
 
