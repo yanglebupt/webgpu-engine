@@ -144,7 +144,6 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 
 - gltf 尝试接入 Geometry 和 Material
 - 完善 gltf 中的骨骼动画
-- shadermaterial
 - 包围盒
 - 碰撞检测
 - 射线
