@@ -122,8 +122,7 @@ async function frame() {
 ![](./public/assets/wgssl.png)
 
 ### 效果视频
-
-<iframe width="1920" height="1080" src="./public/assets/g-m-p.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+https://github.com/yanglebupt/webgpu-engine/assets/139488963/b124df6c-2506-439b-a3b3-cacda3cf3589
 
 # 框架说明
 
