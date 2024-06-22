@@ -4,7 +4,10 @@ Input {
   @location(0) color: vec4f, 
 }
 
-// 用来处理 shader variant 的 shader 上下文，用户可以设置不同的上下文，来得到不同的 shader
+/* 
+  用来处理 shader variant 的 shader 上下文
+  用户可以设置不同的上下文，来得到不同的 shader
+*/
 Context {
   useDefault: bool
 }
