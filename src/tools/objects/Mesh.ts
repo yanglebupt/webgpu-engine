@@ -4,7 +4,7 @@ import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
 import { ShaderBuildResult, WatchAction } from "../materials/Material";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
-import { BuildOptions, Buildable, Renderable } from "../scene/types";
+import { BuildOptions } from "../scene/types";
 import { ShaderLocation } from "../shaders";
 import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
@@ -16,17 +16,12 @@ import { ObservableActionParams, ObservableProxy } from "../utils/Observable";
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
  */
 export class Mesh<
-    G extends Geometry = Geometry,
-    M extends MeshMaterial = MeshMaterial
-  >
-  extends EntityObject
-  implements
-    Buildable,
-    Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
-{
+  G extends Geometry = Geometry,
+  M extends MeshMaterial = MeshMaterial
+> extends EntityObject {
   public geometry: G;
   private _material: M;
-  public name: string = "Mesh";
+  public type = "Mesh";
 
   private buildOptions!: BuildOptions;
   private renderPipeline!: GPURenderPipeline;

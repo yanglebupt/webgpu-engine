@@ -12,7 +12,7 @@ import { CylinderGeometry } from "../../tools/geometrys/CylinderGeometry";
 import { TorusGeometry } from "../../tools/geometrys/TorusGeometry";
 import { CubeGeometry } from "../../tools/geometrys/CubeGeometry";
 import { BlendingPreset } from "../../tools/utils/Blend";
-import "./index.css";
+// import "./index.css";
 import { Clock } from "../../tools/utils/Clock";
 import { RotateScript, RotateScriptOptions } from "./RotateScript";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
@@ -32,7 +32,7 @@ import m_fragment from "./material/fragment.wgssl";
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
-  canvasConfig: { config: { virtual: true } },
+  canvasConfig: { config: { virtual: false } },
 })
   .checkSupport()
   .catch(({ message }) => {
@@ -68,48 +68,55 @@ const metallicRoughnessTexture = await new Texture(
 const emissiveTexture = await new Texture(
   "/standalone/image_imageStoneDemonEmissionColor1024.png"
 ).load();
-const model = await new ObjLoader().load("/standalone/mesh_StoneDeamon.obj");
-model.material = new MeshPhysicalMaterial({
-  baseColorTexture,
-  normalTexture,
-  metallicRoughnessTexture,
-  emissiveTexture,
-});
-const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
-const cpn_1 = mesh.addComponent(RotateScript);
-const cpn_2 = model.addComponent(RotateScript);
-scene.add(mesh);
+// const model = await new ObjLoader().load("/standalone/mesh_StoneDeamon.obj");
+// const model = await new ObjLoader().load("/bunny/bunny-export.obj");
+const model = await new ObjLoader().load(
+  "/bunny/with-mtl/AntiqueCamera/untitled.obj"
+);
+// const model = await new ObjLoader().load(
+//   "/bunny/with-mtl/standalone/untitled.obj"
+// );
+// model.material = new MeshPhysicalMaterial({
+//   baseColorTexture,
+//   normalTexture,
+//   metallicRoughnessTexture,
+//   emissiveTexture,
+// });
+// const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
+// const cpn_1 = mesh.addComponent(RotateScript);
+// const cpn_2 = model.addComponent(RotateScript);
+// scene.add(mesh);
 scene.add(model);
 
-const plane = new Mesh(
-  new PlaneGeometry({ width: 2, height: 2 }),
-  new ShaderMaterial({
-    vertex: m_vertex,
-    fragment: { shaderCode: m_fragment, context: { useDefault: false } },
-    resourceViews: {
-      vertex: [new Uniform("uni", { color: [1, 1, 0, 1] })],
-    },
-  })
-);
-scene.add(plane);
+// const plane = new Mesh(
+//   new PlaneGeometry({ width: 2, height: 2 }),
+//   new ShaderMaterial({
+//     vertex: m_vertex,
+//     fragment: { shaderCode: m_fragment, context: { useDefault: false } },
+//     resourceViews: {
+//       vertex: [new Uniform("uni", { color: [1, 1, 0, 1] })],
+//     },
+//   })
+// );
+// scene.add(plane);
 
-const texture = await new Texture("/coins.jpg").load();
-const composer = new EffectComposer(scene);
+// const texture = await new Texture("/coins.jpg").load();
+// const composer = new EffectComposer(scene);
 
-const pass = new RenderPass(fragment, [
-  new Uniform("uni", { li: 0.2 }),
-  texture,
-]);
+// const pass = new RenderPass(fragment, [
+//   new Uniform("uni", { li: 0.2 }),
+//   texture,
+// ]);
 
 // const pass = new ComputePass(compute, [
 //   new Uniform("uni", { li: 0.2 }),
 //   texture,
 // ]);
 
-composer.addPass(pass);
+// composer.addPass(pass);
 
-const pass_2 = new GlitchPass();
-composer.addPass(pass_2);
+// const pass_2 = new GlitchPass();
+// composer.addPass(pass_2);
 
 const settings = {
   color: [255, 0, 0, 255],
@@ -120,37 +127,34 @@ const settings = {
   li: 0.2,
 };
 const gui = new GUI();
-gui
-  .addColor(settings, "color")
-  .onChange(
-    (c: number[]) =>
-      ((mesh.material as MeshBasicMaterial).color = c.map((v) => v / 255))
-  );
+gui.addColor(settings, "color");
+// .onChange(
+//   (c: number[]) =>
+//     ((mesh.material as MeshBasicMaterial).color = c.map((v) => v / 255))
+// );
 gui.add(settings, "wireframe").onChange((w) => {
-  mesh.material.wireframe = w;
-  model.material.wireframe = w;
+  // mesh.material.wireframe = w;
+  // model.material.wireframe = w;
 });
-gui
-  .add(settings, "metallicFactor", 0, 1, 0.1)
-  .onChange(
-    (m) => ((model.material as MeshPhysicalMaterial).metallicFactor = m)
-  );
-gui
-  .add(settings, "roughnessFactor", 0, 1, 0.1)
-  .onChange(
-    (r) => ((model.material as MeshPhysicalMaterial).roughnessFactor = r)
-  );
+gui.add(settings, "metallicFactor", 0, 1, 0.1);
+// .onChange(
+//   (m) => ((model.material as MeshPhysicalMaterial).metallicFactor = m)
+// );
+gui.add(settings, "roughnessFactor", 0, 1, 0.1);
+// .onChange(
+//   (r) => ((model.material as MeshPhysicalMaterial).roughnessFactor = r)
+// );
 gui.add(settings, "stop").onChange((s) => {
-  cpn_1.stop = s;
-  cpn_2.stop = s;
+  // cpn_1.stop = s;
+  // cpn_2.stop = s;
 });
 
 gui.add(settings, "li", 0.01, 2).onChange((l) => {
-  (pass.resourceViews[0] as Uniform).value.li = l;
+  // (pass.resourceViews[0] as Uniform).value.li = l;
 });
 
 export function frame() {
-  composer.render();
-  // scene.render();
+  // composer.render();
+  scene.render();
   requestAnimationFrame(frame);
 }

@@ -21,18 +21,23 @@ export interface MeshPhysicalMaterial {
   roughnessFactor: number;
   emissiveFactor: Vec3;
   normalScale: number;
+  bumpScale: number;
   occlusionStrength: number;
+  opacity: number;
   alphaCutoff: number;
   applyNormalMap: boolean;
   useEnvMap: boolean;
+  transparent: boolean;
 
   /* 下面属性不支持动态修改 */
   useAlphaCutoff: boolean;
   baseColorTexture?: Texture;
   normalTexture?: Texture;
+  bumpTexture?: Texture;
   metallicRoughnessTexture?: Texture;
   emissiveTexture?: Texture;
   occlusionTexture?: Texture;
+  alphaTexture?: Texture;
 }
 
 export class MeshPhysicalMaterial extends MeshMaterial {
@@ -54,11 +59,14 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       roughnessFactor: 1,
       emissiveFactor: [1, 1, 1],
       normalScale: 1,
+      bumpScale: 1,
       occlusionStrength: 1,
+      opacity: 1,
       useAlphaCutoff: false,
       alphaCutoff: 0,
       applyNormalMap: false,
       useEnvMap: false,
+      transparent: false,
       ...options,
     });
     this.uniformValue = makeStructuredView(

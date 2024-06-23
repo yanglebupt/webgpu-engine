@@ -137,7 +137,8 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 
 # TODO
 
-文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
+- 文件目录结构保持一致，现在大小写混乱 camera/light/loader/....
+- 注意资源的释放
 
 # 后续进度
 

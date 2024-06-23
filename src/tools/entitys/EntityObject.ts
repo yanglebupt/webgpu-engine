@@ -4,10 +4,16 @@ import {
   EntityObjectComponent,
 } from "../components/Component";
 import { Transform } from "../components/Transform";
+import { BuildOptions, Buildable, Renderable } from "../scene/types";
 
 let _objectId = 0;
-export abstract class EntityObject {
-  abstract name: string;
+export abstract class EntityObject
+  implements
+    Buildable,
+    Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
+{
+  abstract type: string;
+  name: string = "";
   description: string = "";
   id = _objectId++;
   transform: Transform;
@@ -16,6 +22,9 @@ export abstract class EntityObject {
     this.transform = new Transform();
     Reflect.set(this.components, Transform.name, this.transform);
   }
+
+  abstract build(options: BuildOptions): void;
+  abstract render(renderPass: GPURenderPassEncoder, device: GPUDevice): void;
 
   addComponent<C extends ComponentConstructorType, P extends Object = {}>(
     construct: C,
