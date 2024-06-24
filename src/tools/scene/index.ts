@@ -1,6 +1,6 @@
 import { Camera, OrbitController } from "../camera";
 import { Component } from "../components/Component";
-import { EntityObject } from "../entitys/EntityObject";
+import { EntityObject, callFunc } from "../entitys/EntityObject";
 import { Logger } from "../helper";
 import { Light } from "../lights";
 import { WebGPURenderer } from "../renderer";
@@ -220,6 +220,29 @@ export class Scene implements Renderable {
     this.makeBindGroup();
   }
 
+  renderChild(
+    renderPass: GPURenderPassEncoder,
+    child: Renderable<any>,
+    dt: number,
+    t: number
+  ) {
+    if (child instanceof EntityObject) {
+      Object.values(Reflect.get(child, "components")).forEach((cpn) => {
+        if (cpn instanceof Component) {
+          if (!Reflect.get(cpn, "isStarted")) {
+            callFunc(cpn, "start");
+            Reflect.set(cpn, "isStarted", true);
+          }
+          callFunc(cpn, "update", [dt, t]);
+        }
+      });
+      child.children.forEach((child) =>
+        this.renderChild(renderPass, child, dt, t)
+      );
+    }
+    child.render(renderPass, this.device);
+  }
+
   render(renderPass: GPURenderPassEncoder): void;
   render(): void;
   render(renderPass?: GPURenderPassEncoder) {
@@ -235,18 +258,7 @@ export class Scene implements Renderable {
       const dt = this.clock.deltaTime;
       const t = this.clock.elapsedTime;
       this.children.forEach((child) => {
-        if (child instanceof EntityObject) {
-          Object.values(Reflect.get(child, "components")).forEach((cpn) => {
-            if (cpn instanceof Component) {
-              if (!cpn.isStarted) {
-                cpn.start();
-                cpn.isStarted = true;
-              }
-              cpn.update(dt, t);
-            }
-          });
-        }
-        child.render(renderPass, this.device);
+        this.renderChild(renderPass, child, dt, t);
       });
     }
   }

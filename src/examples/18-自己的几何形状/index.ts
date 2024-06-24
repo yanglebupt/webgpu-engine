@@ -14,7 +14,7 @@ import { CubeGeometry } from "../../tools/geometrys/CubeGeometry";
 import { BlendingPreset } from "../../tools/utils/Blend";
 // import "./index.css";
 import { Clock } from "../../tools/utils/Clock";
-import { RotateScript, RotateScriptOptions } from "./RotateScript";
+import { RotateScript } from "./RotateScript";
 import { ObjLoader } from "../../tools/loaders/ObjLoader";
 import { MeshPhysicalMaterial } from "../../tools/materials/MeshPhysicalMaterial";
 import { Texture } from "../../tools/textures/Texture";
@@ -73,6 +73,7 @@ const emissiveTexture = await new Texture(
 const model = await new ObjLoader().load(
   "/bunny/with-mtl/AntiqueCamera/untitled.obj"
 );
+console.log(model);
 // const model = await new ObjLoader().load(
 //   "/bunny/with-mtl/standalone/untitled.obj"
 // );
@@ -84,7 +85,7 @@ const model = await new ObjLoader().load(
 // });
 // const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
 // const cpn_1 = mesh.addComponent(RotateScript);
-// const cpn_2 = model.addComponent(RotateScript);
+const cpn_2 = model.addComponent(RotateScript);
 // scene.add(mesh);
 scene.add(model);
 
@@ -146,7 +147,7 @@ gui.add(settings, "roughnessFactor", 0, 1, 0.1);
 // );
 gui.add(settings, "stop").onChange((s) => {
   // cpn_1.stop = s;
-  // cpn_2.stop = s;
+  cpn_2.stop = s;
 });
 
 gui.add(settings, "li", 0.01, 2).onChange((l) => {

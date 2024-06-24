@@ -438,5 +438,7 @@ export class Mesh<
     this.buildFragmentResources(options);
     /////////////////// 创建 pipeline //////////////////
     this.buildPipeline(options);
+
+    super.build(options);
   }
 }

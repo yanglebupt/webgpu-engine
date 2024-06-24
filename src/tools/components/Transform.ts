@@ -1,7 +1,8 @@
 import { Mat3, Mat4, Quat, Vec3, mat4, quat, vec3 } from "wgpu-matrix";
-import { Component } from "./Component";
+import { EntityObjectComponent } from "./Component";
 import { Euler } from "../maths/Euler";
 import { Quaternion } from "../maths/Quaternion";
+import { EntityObject } from "../entitys/EntityObject";
 
 const _q1 = quat.create();
 const _v1 = vec3.create();
@@ -10,7 +11,7 @@ const _yAxis = vec3.create(0, 1, 0);
 const _zAxis = vec3.create(0, 0, 1);
 const _matrix = mat4.create();
 
-export class Transform extends Component {
+export class Transform extends EntityObjectComponent {
   position: Vec3 = vec3.zero();
   // quaternion 和 rotation 要同步
   rotation: Euler = new Euler();
@@ -18,8 +19,8 @@ export class Transform extends Component {
   scale: Vec3 = vec3.create(1, 1, 1);
   matrix: Mat4 = mat4.identity();
 
-  constructor() {
-    super();
+  constructor(public object: EntityObject) {
+    super(object);
     this.quaternion.onChange = () => {
       mat4.fromQuat(this.quaternion.elements, _matrix);
       this.rotation.setFromRotationMatrix(_matrix, this.rotation.order, false);
@@ -137,5 +138,7 @@ export class Transform extends Component {
       this.scale,
       this.matrix
     );
+    const parent = this.object.parent?.matrix;
+    if (parent) mat4.multiply(parent, this.matrix, this.matrix);
   }
 }

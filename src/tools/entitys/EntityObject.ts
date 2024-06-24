@@ -6,6 +6,14 @@ import {
 import { Transform } from "../components/Transform";
 import { BuildOptions, Buildable, Renderable } from "../scene/types";
 
+export function callFunc(
+  obj: any,
+  name: PropertyKey,
+  argumentsList: Readonly<any> = []
+) {
+  return Reflect.apply(Reflect.get(obj, name), obj, argumentsList);
+}
+
 let _objectId = 0;
 export abstract class EntityObject
   implements
@@ -17,27 +25,30 @@ export abstract class EntityObject
   description: string = "";
   id = _objectId++;
   transform: Transform;
+  parent: Transform | null = null;
+  children: EntityObject[] = [];
   private components: Record<string, Component> = {};
   constructor() {
-    this.transform = new Transform();
+    this.transform = new Transform(this);
     Reflect.set(this.components, Transform.name, this.transform);
   }
 
-  abstract build(options: BuildOptions): void;
-  abstract render(renderPass: GPURenderPassEncoder, device: GPUDevice): void;
+  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {}
 
-  addComponent<C extends ComponentConstructorType, P extends Object = {}>(
+  build(options: BuildOptions) {
+    this.children.forEach((child) => child.build(options));
+  }
+
+  addComponent<C extends ComponentConstructorType>(
     construct: C,
-    options?: Partial<P>
+    options?: Partial<InstanceType<C>>
   ) {
     const cpn = Reflect.construct(
       construct,
-      construct.prototype instanceof EntityObjectComponent
-        ? [this, options]
-        : []
+      construct.prototype instanceof EntityObjectComponent ? [this] : []
     ) as Component;
-    cpn.awake();
-    cpn.transform = this.transform;
+    callFunc(cpn, "awake");
+    Object.assign(cpn, options);
     Reflect.set(this.components, construct.name, cpn);
     return cpn as InstanceType<C>;
   }
@@ -49,4 +60,17 @@ export abstract class EntityObject
   getComponent<C extends ComponentConstructorType>(construct: C) {
     return Reflect.get(this.components, construct.name) as InstanceType<C>;
   }
+
+  addChildren(child: EntityObject) {
+    child.parent = this.transform;
+    this.children.push(child);
+  }
+
+  getChildren(idx: number) {
+    return this.children[idx];
+  }
+
+  removeChildren() {}
+
+  clearChildren() {}
 }
