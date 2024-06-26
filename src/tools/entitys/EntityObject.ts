@@ -21,6 +21,7 @@ export abstract class EntityObject
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   abstract type: string;
+  static = false;
   name: string = "";
   description: string = "";
   id = _objectId++;

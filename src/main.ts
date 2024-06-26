@@ -16,7 +16,8 @@
 // import { frame } from "./examples/15-IBL-BRDF 重要性采样";
 // import { frame } from "./examples/16-IBL-重要性采样";
 // import { frame } from "./examples/17-自己的mipmap类";
-import { frame } from "./examples/18-自己的几何形状/";
+// import { frame } from "./examples/18-自己的几何形状/";
+import { frame } from "./examples/19-重构 GLTFLoader";
 
 requestAnimationFrame(frame);
 

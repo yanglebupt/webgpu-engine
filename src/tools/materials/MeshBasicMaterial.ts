@@ -52,6 +52,7 @@ export class MeshBasicMaterial extends MeshMaterial {
       size: this.uniformValue.arrayBuffer.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    this.update(device);
     return {
       fragment: {
         resources: [this.uniform],

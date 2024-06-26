@@ -158,7 +158,7 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
       { sampler: cached.sampler },
       fragment
     );
-
+    this.update(device);
     return {
       fragment: this.fragmentBuildResult,
       vertex: this.vertexBuildResult,

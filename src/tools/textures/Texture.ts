@@ -5,26 +5,31 @@ import {
 } from "webgpu-utils";
 import { maxMipLevelCount } from "../utils/mipmaps";
 import { GPUSamplerCache } from "../scene/cache";
+import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 
-export interface Texture {
-  format: GPUTextureFormat;
-  mips: boolean;
-  flipY: boolean;
+export interface TextureOptions {
+  format?: GPUTextureFormat;
+  mips?: boolean;
+  flipY?: boolean;
 }
 
 export class Texture {
   sampler!: GPUSampler;
   source!: TextureSource;
   texture!: GPUTexture;
-  private filename: string;
+
+  format: GPUTextureFormat;
+  mips: boolean;
+  flipY: boolean;
 
   constructor(
-    filename: string,
-    options?: { format?: GPUTextureFormat; mips?: boolean; flipY?: boolean },
+    public filename: string,
+    public options?: TextureOptions,
     public samplerDescriptor?: GPUSamplerDescriptor
   ) {
-    this.filename = filename;
-    Object.assign(this, { flipY: true, ...options });
+    this.format = options?.format ?? StaticTextureUtil.textureFormat;
+    this.mips = options?.mips ?? false;
+    this.flipY = options?.flipY ?? true;
   }
 
   async load() {
@@ -38,13 +43,14 @@ export class Texture {
     cached: GPUSamplerCache,
     format?: GPUTextureFormat
   ) {
+    if (format) this.format = format;
     const [width, height] = getSizeFromSource(this.source, {});
     this.sampler = this.samplerDescriptor
       ? cached.get(this.samplerDescriptor)
       : cached.default;
     this.texture = createTextureFromSource(device, this.source, {
       flipY: this.flipY,
-      format: format ?? this.format,
+      format: this.format,
       mips: false,
       usage:
         GPUTextureUsage.TEXTURE_BINDING |

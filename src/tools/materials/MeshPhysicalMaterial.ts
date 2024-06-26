@@ -74,7 +74,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     );
   }
 
-  private get textures() {
+  protected get textures() {
     return [
       {
         a: this.baseColorTexture,
@@ -158,6 +158,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
           .createView();
       }
     });
+    this.update(device);
     return {
       fragment: {
         resources: [this.uniform, ...texturesView, cached.sampler.default],

@@ -18,6 +18,8 @@ export class Transform extends EntityObjectComponent {
   quaternion: Quaternion = new Quaternion();
   scale: Vec3 = vec3.create(1, 1, 1);
   matrix: Mat4 = mat4.identity();
+  worldMatrix: Mat4 = mat4.identity();
+  worldNormalMatrix: Mat4 = mat4.identity();
 
   constructor(public object: EntityObject) {
     super(object);
@@ -28,13 +30,11 @@ export class Transform extends EntityObjectComponent {
 
     this.rotation.onChange = () =>
       this.quaternion.setFromEuler(this.rotation, false);
+
+    this.updateWorldMatrix();
   }
 
-  get normalMatrix() {
-    return mat4.transpose(mat4.inverse(this.matrix));
-  }
-
-  applyMatrix4(matrix: Mat4) {
+  applyMatrix4(matrix: Mat4, updateWorldMatrix: boolean = false) {
     mat4.multiply(matrix, this.matrix, this.matrix);
 
     mat4.decompose(
@@ -43,6 +43,9 @@ export class Transform extends EntityObjectComponent {
       this.position,
       this.scale
     );
+
+    if (updateWorldMatrix) this.updateWorldMatrix();
+
     return this;
   }
 
@@ -138,7 +141,15 @@ export class Transform extends EntityObjectComponent {
       this.scale,
       this.matrix
     );
+    this.updateWorldMatrix();
+  }
+
+  updateWorldMatrix() {
     const parent = this.object.parent?.matrix;
-    if (parent) mat4.multiply(parent, this.matrix, this.matrix);
+    parent
+      ? mat4.multiply(parent, this.matrix, this.worldMatrix)
+      : mat4.copy(this.matrix, this.worldMatrix);
+    mat4.inverse(this.worldMatrix, _matrix);
+    mat4.transpose(_matrix, this.worldNormalMatrix);
   }
 }

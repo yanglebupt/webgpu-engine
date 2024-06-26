@@ -102,7 +102,7 @@ export class Mesh<
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
-    this.updateBuffers(device);
+    if (!this.static) this.updateBuffers(device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     renderPass.setPipeline(this.renderPipeline);
     if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
@@ -120,8 +120,8 @@ export class Mesh<
   updateBuffers(device: GPUDevice) {
     const { transformUniformValue, transformUniform } =
       this.componentBuildResult;
-    transformUniformValue.set(this.transform.matrix, 0);
-    transformUniformValue.set(this.transform.normalMatrix, 16);
+    transformUniformValue.set(this.transform.worldMatrix, 0);
+    transformUniformValue.set(this.transform.worldNormalMatrix, 16);
     device.queue.writeBuffer(transformUniform, 0, transformUniformValue);
     this.material.update(device);
   }
