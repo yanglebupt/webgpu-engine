@@ -122,7 +122,7 @@ const loadingBar = new LoaderBarDomElement(parentDom);
 
 // 新建一个 WebGPURenderer
 const renderer = (await new WebGPURenderer({
-  parentID: parentDom.id,
+  canvasConfig: { parentID: parentDom.id },
 })
   .checkSupport()
   .catch(({ message }) => {

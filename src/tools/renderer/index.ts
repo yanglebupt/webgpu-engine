@@ -161,6 +161,7 @@ export class WebGPURenderer {
       envMap.compute(computePass, this.device);
       computePass.end();
     }
+
     const canvasTexture = this.ctx.getCurrentTexture();
     const depthTexture = StaticTextureUtil.createDepthTexture(
       this.device,
@@ -198,36 +199,18 @@ export class WebGPURenderer {
     });
     scene.render(pass);
     pass.end();
-
-    if (envMap && !envMap.doned) {
-      const sc = new StorageTextureToCanvas(this.device, encoder);
-      const size = [envMap.specularTexure.width, envMap.specularTexure.height];
-      sc.render(envMap.diffuseTexure, {});
-      for (
-        let baseMipLevel = 0;
-        baseMipLevel < envMap.specularTexure.mipLevelCount;
-        baseMipLevel++
-      ) {
-        const s = getSizeForMipFromTexture(size, baseMipLevel);
-        sc.render(
-          envMap.specularTexure,
-          {
-            baseMipLevel,
-            mipLevelCount: 1,
-          },
-          { width: s[0], height: s[1] }
-        );
-      }
-    }
-
-    if (!realtime && envMap) {
-      envMap.done();
-    }
   }
 
   render(scene: Scene) {
     const encoder = this.device.createCommandEncoder();
     this.renderScene(scene, encoder);
     this.device.queue.submit([encoder.finish()]);
+    // destroyUnused
+    const realtime = scene.options?.realtime ?? false;
+    const envMap = scene.options?.envMap;
+    // 销毁一些资源
+    if (!realtime && envMap) {
+      envMap.done();
+    }
   }
 }
