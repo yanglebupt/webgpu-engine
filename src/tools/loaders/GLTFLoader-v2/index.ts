@@ -1,4 +1,4 @@
-import { Mat4, mat4 } from "wgpu-matrix";
+import { mat4 } from "wgpu-matrix";
 import {
   BuiltRenderPipelineOptions,
   CreateAndSetRecord,
@@ -54,20 +54,13 @@ export function createGLTFNode(
   meshes: GLTFMesh[],
   nodes: GLTFNodeI[]
 ) {
-  const gltfNode = new GLTFNode(meshes[node.mesh], node);
+  const gltfNode = new GLTFNode(node, meshes[node.mesh]);
   if (node.children) {
     node.children.forEach((child) => {
       gltfNode.addChildren(createGLTFNode(nodes[child], meshes, nodes));
     });
   }
   return gltfNode;
-}
-
-export interface FlattenNode {
-  name: string;
-  matrix: Mat4;
-  mesh: number;
-  camera: number;
 }
 
 export const MAGIC_NUMBER = 0x46546c67;
@@ -162,18 +155,18 @@ export enum GLTFTypeNumber {
   MAT4 = 16,
 }
 
-export interface AttributeAccessor {
+export interface AttributeAccessorI {
   name: string;
   shaderLocation: number;
   accessor: GLTFAccessor;
 }
 
-export interface GLTFAsset {
+export interface GLTFAssetI {
   generator: string;
   version: string;
 }
 
-export interface GLTFScene {
+export interface GLTFSceneI {
   name: string;
   nodes: number[];
 }
@@ -189,24 +182,24 @@ export interface GLTFNodeI {
   matrix: number[];
 }
 
-export interface GLTFMesh {
+export interface GLTFMeshI {
   name: string;
-  primitives: GLTFPrimitive[];
+  primitives: GLTFPrimitiveI[];
 }
-export interface GLTFPrimitive {
+export interface GLTFPrimitiveI {
   mode: number;
   attributes: Record<string, number>;
   indices: number;
   material?: number;
 }
-export interface GLTFAccessor {
+export interface GLTFAccessorI {
   bufferView: number;
   componentType: number;
   count: number;
   type: string;
   byteOffset: number;
 }
-export interface GLTFBufferView {
+export interface GLTFBufferViewI {
   buffer: number;
   byteOffset: number;
   byteLength: number;
@@ -214,16 +207,16 @@ export interface GLTFBufferView {
   target: number;
 }
 
-export interface GLTFBuffer {
+export interface GLTFBufferI {
   byteLength: number;
 }
 
-export interface GLTFImage {
+export interface GLTFImageI {
   name: string;
   bufferView: number;
   mimeType: "image/png" | "image/jpeg";
 }
-export interface GLTFSampler {
+export interface GLTFSamplerI {
   magFilter?: number;
   minFilter?: number;
   wrapS?: number;
@@ -256,16 +249,16 @@ export interface GLTFMaterialI {
 }
 
 export interface GLTFJSON {
-  asset: GLTFAsset;
+  asset: GLTFAssetI;
   scene: number;
-  scenes: GLTFScene[];
+  scenes: GLTFSceneI[];
   nodes: GLTFNodeI[];
-  meshes: GLTFMesh[];
-  accessors: GLTFAccessor[];
-  bufferViews: GLTFBufferView[];
-  buffers: GLTFBuffer[];
-  images?: GLTFImage[];
-  samplers?: GLTFSampler[];
+  meshes: GLTFMeshI[];
+  accessors: GLTFAccessorI[];
+  bufferViews: GLTFBufferViewI[];
+  buffers: GLTFBufferI[];
+  images?: GLTFImageI[];
+  samplers?: GLTFSamplerI[];
   textures?: GLTFTextureI[];
   materials?: GLTFMaterialI[];
 }
@@ -316,11 +309,11 @@ export class GLTFLoaderV2 {
     );
 
     const bufferViews = json.bufferViews.map(
-      (view) => new GLTFBufferView(binary, view)
+      (view) => new GLTFBufferView(view, binary)
     );
 
     const accessors = json.accessors.map(
-      (accessor) => new GLTFAccessor(bufferViews[accessor.bufferView], accessor)
+      (accessor) => new GLTFAccessor(accessor, bufferViews[accessor.bufferView])
     );
 
     const images =
@@ -330,7 +323,7 @@ export class GLTFLoaderV2 {
 
     await Promise.all(
       images?.map(async (image) => {
-        await image.view.createBitmap(image);
+        await image.view.createBitmap(image.__json);
       }) ?? []
     );
 
@@ -369,7 +362,7 @@ export class GLTFLoaderV2 {
             : null;
         const attributeAccessors = Object.keys(primitive.attributes)
           .map((attributeKey) => {
-            const accessor: AttributeAccessor = {
+            const accessor: AttributeAccessorI = {
               name: attributeKey,
               shaderLocation: Reflect.get(ShaderLocation, attributeKey),
               accessor:
@@ -379,6 +372,7 @@ export class GLTFLoaderV2 {
           })
           .filter(({ shaderLocation }) => shaderLocation !== undefined);
         return new GLTFPrimitive(
+          primitive,
           indices,
           topology,
           attributeAccessors,
@@ -386,12 +380,11 @@ export class GLTFLoaderV2 {
             primitive.material !== undefined
               ? materials[primitive.material]
               : new GLTFBasicMaterial()
-          ),
-          primitive
+          )
         );
       });
 
-      return new GLTFMesh(primitives, mesh);
+      return new GLTFMesh(mesh, primitives);
     });
 
     // 渲染第一个或者默认场景
@@ -407,7 +400,7 @@ export class GLTFLoaderV2 {
       return createGLTFNode(node, meshes, json.nodes);
     });
 
-    return new GLTFScene(nodes, meshes, defaultScene, bufferViews);
+    return new GLTFScene(defaultScene, nodes, meshes, bufferViews);
   }
 }
 
@@ -458,13 +451,13 @@ export class GLTFScene extends Group {
   static: boolean = true;
   public record: CreateAndSetRecord;
   constructor(
-    a_node: GLTFNode[],
-    public a_meshs: GLTFMesh[],
-    scene: GLTFScene,
+    public __json: GLTFSceneI,
+    nodes: GLTFNode[],
+    public meshs: GLTFMesh[],
     public bufferViews: GLTFBufferView[]
   ) {
-    super(a_node);
-    Object.assign(this, scene);
+    super(nodes);
+    this.name = __json.name;
     this.record = new CreateAndSetRecord();
     this.renderPipelines = new Map();
   }
@@ -501,11 +494,12 @@ export class GLTFScene extends Group {
     };
 
     // tranverse node
-    this.traverse((a_node: GLTFNode) => {
-      if (!a_node.a_mesh) return;
-      const transform = a_node.transform;
-      a_node.a_mesh.primitives.forEach((primitive) => {
-        const primitiveNodesKey = JSON.stringify(primitive);
+    this.traverse((node: GLTFNode) => {
+      const transform = node.transform;
+      transform.updateWorldMatrix(); // add child 之后需要更新世界变换矩阵
+      if (!node.mesh) return;
+      node.mesh.primitives.forEach((primitive) => {
+        const primitiveNodesKey = JSON.stringify(primitive.__json);
         let primitiveNodes = primitiveNodesMap.get(primitiveNodesKey);
         if (!primitiveNodes) {
           primitiveNodes = [];
@@ -544,8 +538,8 @@ export class GLTFScene extends Group {
       因为不同 node 会用同一个 mesh（在上一步遍历已经包括了），导致重复
     */
     // tranverse mesh
-    this.a_meshs.forEach((a_mesh) => {
-      a_mesh.a_primitives.forEach((a_primitive) => {
+    this.meshs.forEach((mesh) => {
+      mesh.primitives.forEach((primitive) => {
         const {
           args,
           vertex,
@@ -553,9 +547,9 @@ export class GLTFScene extends Group {
           indices,
           vertexCount,
           fragment: { resources, bindGroupLayoutEntries, shader },
-        } = a_primitive.build(options);
+        } = primitive.build(options);
 
-        const materialKey = JSON.stringify(a_primitive.a_material.__json);
+        const materialKey = JSON.stringify(primitive.material.__json);
         let material = materialCache.get(materialKey);
         const materialBindGroupLayout = cached.bindGroupLayout.get(
           bindGroupLayoutEntries
@@ -617,7 +611,7 @@ export class GLTFScene extends Group {
           indices,
           vertexCount,
           instanceInAll: this.setInstancePosForPrimitiveNodes(
-            a_primitive,
+            primitive,
             primitiveInstances
           ),
         });
@@ -674,10 +668,10 @@ export class GLTFScene extends Group {
   updateBuffers() {
     if (!this.primitiveInstances.arrayBuffer) return;
     this.primitiveInstances.offset = 0;
-    this.a_meshs.forEach((a_mesh) => {
-      a_mesh.a_primitives.forEach((a_primitive) => {
+    this.meshs.forEach((mesh) => {
+      mesh.primitives.forEach((primitive) => {
         this.setInstancePosForPrimitiveNodes(
-          a_primitive,
+          primitive,
           this.primitiveInstances
         );
       });
@@ -722,10 +716,10 @@ export class GLTFScene extends Group {
             renderPass.setIndexBuffer(
               indices.view.gpuBuffer!,
               indices.vertexType,
-              indices.byteOffset,
+              indices.__json.byteOffset,
               indices.byteLength
             );
-            renderPass.drawIndexed(indices.count, count, 0, 0, first);
+            renderPass.drawIndexed(indices.__json.count, count, 0, 0, first);
           } else {
             renderPass.draw(vertexCount, count, 0, first);
           }
@@ -752,10 +746,10 @@ export class GLTFScene extends Group {
 // gltf node
 export class GLTFNode extends EntityObject {
   type: string = "GLTFNode";
-  constructor(public a_mesh: GLTFMesh, node: GLTFNodeI) {
+  constructor(public __json: GLTFNodeI, public mesh: GLTFMesh) {
     super();
-    this.name = node.name;
-    this.transform.applyMatrix4(readNodeTransform(node), true);
+    this.name = __json.name;
+    this.transform.applyMatrix4(readNodeTransform(__json), true);
   }
   updateBuffers() {}
   build() {}
@@ -763,9 +757,7 @@ export class GLTFNode extends EntityObject {
 
 // gltf mesh ：遍历，为每个 primitive 创建对应的渲染管线
 export class GLTFMesh {
-  constructor(public a_primitives: GLTFPrimitive[], mesh: GLTFMesh) {
-    Object.assign(this, mesh);
-  }
+  constructor(public __json: GLTFMeshI, public primitives: GLTFPrimitive[]) {}
 }
 
 export interface GPUBufferAccessor {
@@ -778,16 +770,13 @@ export class GLTFPrimitive {
   public bufferLayout: GPUVertexBufferLayout[] = [];
   public gpuBuffers: GPUBufferAccessor[] = [];
   constructor(
-    public a_indices: GLTFAccessor | null,
+    public __json: GLTFPrimitiveI,
+    public indices: GLTFAccessor | null,
     public topology: GLTFRenderMode,
-    public attributeAccessors: AttributeAccessor[],
-    public a_material: GLTFMaterial,
-    public __json: GLTFPrimitive
+    public attributeAccessors: AttributeAccessorI[],
+    public material: GLTFMaterial
   ) {
-    Object.assign(this, this.__json);
-    this.a_indices?.view.addUsage(
-      GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-    );
+    this.indices?.view.addUsage(GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST);
     this.setPrimitive();
   }
 
@@ -795,26 +784,26 @@ export class GLTFPrimitive {
     const primitive: GPUPrimitiveState = { topology: "triangle-list" };
     if (this.topology == GLTFRenderMode.TRIANGLE_STRIP) {
       primitive.topology = "triangle-strip";
-      if (this.a_indices)
-        primitive.stripIndexFormat = this.a_indices!.vertexType;
+      if (this.indices) primitive.stripIndexFormat = this.indices!.vertexType;
     }
+    const { attributes } = this.__json;
     return {
       args: {
         primitive,
         bufferLayout: this.bufferLayout,
-        alphaMode: this.a_material.alphaMode,
-        doubleSided: this.a_material.doubleSided,
+        alphaMode: this.material.alphaMode,
+        doubleSided: this.material.doubleSided,
       },
       vertex: {
         code: vertex,
         context: {
-          useNormal: "NORMAL" in this.attributes,
-          useTexcoord: "TEXCOORD_0" in this.attributes,
+          useNormal: "NORMAL" in attributes,
+          useTexcoord: "TEXCOORD_0" in attributes,
         },
       },
       vertexCount: this.vertexCount,
       gpuBuffers: this.gpuBuffers,
-      indices: this.a_indices,
+      indices: this.indices,
     };
   }
 
@@ -826,16 +815,19 @@ export class GLTFPrimitive {
       { accessor: GLTFAccessor; offset: number }
     > = new Map();
     this.attributeAccessors
-      .sort((a, b) => a.accessor.byteOffset - b.accessor.byteOffset)
+      .sort(
+        (a, b) => a.accessor.__json.byteOffset - b.accessor.__json.byteOffset
+      )
       .forEach(({ accessor, name, shaderLocation }) => {
-        if (name == "POSITION") this.vertexCount = accessor.count;
-        accessor.view.addUsage(GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
-        let buffer = bufferLayout.get(accessor.bufferView);
+        const { __json, view } = accessor;
+        if (name == "POSITION") this.vertexCount = __json.count;
+        view.addUsage(GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
+        let buffer = bufferLayout.get(__json.bufferView);
         let gpuBuffer;
         let separate =
           buffer &&
           Math.abs(
-            accessor.byteOffset -
+            __json.byteOffset -
               (buffer.attributes as GPUVertexAttribute[])[0].offset
           ) >= buffer.arrayStride;
         // 如果是第一个或者是 separate，则需要新建一个 GPUVertexBufferLayout
@@ -846,22 +838,22 @@ export class GLTFPrimitive {
           };
           // 如果是 separate 则每个 name 对应一个 GPUVertexBufferLayout
           // 否则都使用同一个 bufferView index 指向同一个 GPUVertexBufferLayout
-          bufferLayout.set(separate ? name : accessor.bufferView, buffer);
+          bufferLayout.set(separate ? name : __json.bufferView, buffer);
           // 每个 GPUVertexBufferLayout 指向一个真实的 GPUBuffer
           gpuBuffers.set(buffer, {
             accessor: accessor,
-            offset: accessor.byteOffset,
+            offset: __json.byteOffset,
           });
         } else {
           // 如果是 interleaved
           gpuBuffer = gpuBuffers.get(buffer)!;
-          gpuBuffer.offset = Math.min(gpuBuffer.offset, accessor.byteOffset);
+          gpuBuffer.offset = Math.min(gpuBuffer.offset, __json.byteOffset);
         }
 
         (buffer.attributes as GPUVertexAttribute[]).push({
           shaderLocation,
           format: accessor.vertexType,
-          offset: accessor.byteOffset,
+          offset: __json.byteOffset,
         });
       });
 
@@ -900,7 +892,7 @@ export class GLTFPrimitive {
   // 设置 material，有些 primitive 可以不存在 material
   build(options: BuildOptions) {
     const vertexRes = this.buildVertex();
-    const fragmentRes = this.a_material.build(options);
+    const fragmentRes = this.material.build(options);
     return { ...vertexRes, fragment: { ...fragmentRes.fragment } };
   }
 }
@@ -924,16 +916,17 @@ export class GLTFBufferView {
   gpuBuffer: GPUBuffer | null = null;
   bitmap: ImageBitmap | null = null;
   flag: GLTFBufferViewFlag = GLTFBufferViewFlag.BUFFER;
-  constructor(buffer: GLTFBuffer, view: GLTFBufferView) {
-    Object.assign(this, {
+  __json: GLTFBufferViewI;
+  constructor(__json: GLTFBufferViewI, buffer: GLTFBuffer) {
+    this.__json = {
+      //@ts-ignore
       byteStride: 0,
+      //@ts-ignore
       byteOffset: 0,
-      ...(view as Partial<GLTFBufferView>),
-    });
-    this.viewBuffer = buffer.subarray(
-      this.byteOffset,
-      this.byteOffset + this.byteLength
-    );
+      ...__json,
+    };
+    const { byteOffset, byteLength } = this.__json;
+    this.viewBuffer = buffer.subarray(byteOffset, byteOffset + byteLength);
   }
 
   setFlag(flag: GLTFBufferViewFlag) {
@@ -944,8 +937,8 @@ export class GLTFBufferView {
     this.usage = this.usage | usage;
   }
 
-  async createBitmap(image: GLTFImage) {
-    const blob = new Blob([this.viewBuffer], { type: image.mimeType });
+  async createBitmap(__json: GLTFImageI) {
+    const blob = new Blob([this.viewBuffer], { type: __json.mimeType });
     this.bitmap = await createImageBitmap(blob);
   }
 
@@ -968,40 +961,42 @@ export class GLTFBufferView {
 
 // gltf accessor ：访问指定的 GLTFBufferView，并解析对应类型，同步创建对应的 GPUBuffer
 export class GLTFAccessor {
-  constructor(public view: GLTFBufferView, accessor: GLTFAccessor) {
-    Object.assign(this, {
+  public __json: GLTFAccessorI;
+  constructor(__json: GLTFAccessorI, public view: GLTFBufferView) {
+    this.__json = {
+      //@ts-ignore
       byteOffset: 0,
-      ...(accessor as Partial<GLTFAccessor>),
-    });
+      ...__json,
+    };
   }
 
   // step="vertex" 下的步长 单个vertex数据点的长度
   get byteStride() {
+    const { type, componentType } = this.__json;
     const elementSize =
-      Reflect.get(GLTFTypeNumber, this.type) *
+      Reflect.get(GLTFTypeNumber, type) *
       Reflect.get(
         GLTFComponentTypeSize,
-        Reflect.get(GLTFComponentType, this.componentType)
+        Reflect.get(GLTFComponentType, componentType)
       );
-    return Math.max(elementSize, this.view.byteStride);
+    return Math.max(elementSize, this.view.__json.byteStride);
   }
 
   // 整个 vertex buffer 的长度
   get byteLength() {
-    return this.count * this.byteStride;
+    return this.__json.count * this.byteStride;
   }
 
   // 返回单个 vertex 数据点的类型对应 GPUVertexFormat
   get vertexType() {
+    const { componentType, type } = this.__json;
     const componentVertexFormat = Reflect.get(
       GLTFComponentType2GPUVertexFormat,
-      Reflect.get(GLTFComponentType, this.componentType)
+      Reflect.get(GLTFComponentType, componentType)
     );
     if (!componentVertexFormat)
-      throw Error(
-        `Unrecognized or unsupported glTF type ${this.componentType}`
-      );
-    const componentNums = Reflect.get(GLTFTypeNumber, this.type);
+      throw Error(`Unrecognized or unsupported glTF type ${componentType}`);
+    const componentNums = Reflect.get(GLTFTypeNumber, type);
     return componentNums > 1
       ? `${componentVertexFormat}x${componentNums}`
       : componentVertexFormat;
@@ -1009,8 +1004,7 @@ export class GLTFAccessor {
 }
 
 export class GLTFImage {
-  constructor(image: GLTFImage, public view: GLTFBufferView) {
-    Object.assign(this, image);
+  constructor(public __json: GLTFImageI, public view: GLTFBufferView) {
     view.setFlag(GLTFBufferViewFlag.TEXTURE);
     view.addUsage(
       GPUTextureUsage.TEXTURE_BINDING |
@@ -1022,22 +1016,22 @@ export class GLTFImage {
 
 export class GLTFSampler {
   samplerDescriptor: GPUSamplerDescriptor;
-  constructor(sampler: GLTFSampler) {
-    Object.assign(this, sampler);
+  constructor(public __json: GLTFSamplerI) {
     this.samplerDescriptor = this.getSamplerDescriptor();
   }
 
   getSamplerDescriptor() {
+    const { wrapS, wrapT, magFilter, minFilter } = this.__json;
     const descriptor: GPUSamplerDescriptor = {
-      addressModeU: this.addressModeForWrap(this.wrapS),
-      addressModeV: this.addressModeForWrap(this.wrapT),
+      addressModeU: this.addressModeForWrap(wrapS),
+      addressModeV: this.addressModeForWrap(wrapT),
     };
     // WebGPU's default min/mag/mipmap filtering is nearest, se we only have to override it if we
     // want linear filtering for some aspect.
-    if (!this.magFilter || this.magFilter === GLTFSamplerMagFilterType.LINEAR) {
+    if (!magFilter || magFilter === GLTFSamplerMagFilterType.LINEAR) {
       descriptor.magFilter = "linear";
     }
-    switch (this.minFilter) {
+    switch (minFilter) {
       case WebGLRenderingContext.NEAREST:
         break;
       case WebGLRenderingContext.LINEAR:
@@ -1071,12 +1065,12 @@ export class GLTFSampler {
 
 export class GLTFTexture extends Texture {
   constructor(
-    public a_image: GLTFImage,
-    public a_sampler?: GLTFSampler,
+    image: GLTFImage,
+    sampler?: GLTFSampler,
     options?: TextureOptions
   ) {
-    super("", options, a_sampler?.samplerDescriptor);
-    this.source = a_image.view.bitmap!;
+    super("", options, sampler?.samplerDescriptor);
+    this.source = image.view.bitmap!;
   }
 }
 
@@ -1093,8 +1087,8 @@ export class GLTFPhysicalMaterial
   doubleSided: boolean;
   constructor(
     public __json: GLTFMaterialI,
-    public a_textures: GLTFTexture[],
-    public useEnvMap: boolean
+    textures: GLTFTexture[],
+    useEnvMap: boolean
   ) {
     super(
       clearEmptyPropertyOfObject({
@@ -1112,11 +1106,6 @@ export class GLTFPhysicalMaterial
     );
     this.alphaMode = __json.alphaMode ?? "OPAQUE";
     this.doubleSided = __json.doubleSided ?? false;
-    this.setTexture();
-  }
-
-  setTexture() {
-    const __json = this.__json;
     (
       [
         {
@@ -1139,7 +1128,7 @@ export class GLTFPhysicalMaterial
     ).forEach(({ k, a }) => {
       const notUseDefault = a?.index !== undefined;
       if (notUseDefault) {
-        Reflect.set(this, k, this.a_textures[a.index!]);
+        Reflect.set(this, k, textures[a.index!]);
       }
     });
   }
@@ -1152,11 +1141,10 @@ export class GLTFBasicMaterial
   alphaMode: BlendMode;
   doubleSided: boolean;
   __json: Record<string, any>;
-
   constructor() {
     super({ color: defaultColor });
+    this.__json = {};
     this.alphaMode = "OPAQUE";
     this.doubleSided = false;
-    this.__json = {};
   }
 }

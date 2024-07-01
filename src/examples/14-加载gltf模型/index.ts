@@ -101,9 +101,7 @@ const settings = {
   model_name: "stone_demon",
   flux: 10.0,
   posLightY: 2.2,
-  mips: false,
   hasEnvMap: true,
-  useEnvMap: true,
 };
 const gui = new GUI();
 gui
@@ -111,9 +109,7 @@ gui
   .onChange(() => (changed = true));
 gui.add(settings, "flux", 1, 40);
 gui.add(settings, "posLightY", 0, 5).name("点光源 Y 位置"); // 后面我们会将物体平移到原点，这样就能看清点光源的移动了
-gui.add(settings, "mips");
 gui.add(settings, "hasEnvMap");
-gui.add(settings, "useEnvMap");
 
 const parentDom = document.createElement("div");
 parentDom.id = "canvas-parent";
@@ -140,6 +136,9 @@ const hdr_filename = `${base}image_imageBlaubeurenNight1k.hdr`;
 const envMap = await new EnvMapLoader().load(hdr_filename);
 
 async function init() {
+  // 重新开启 mipmap 生成通道
+  renderer.cached.mipmap.reopen();
+
   // 选择加载哪个模型
   const config = model_gltf_configs[settings.model_name];
 
@@ -167,8 +166,8 @@ async function init() {
   const loader = new GLTFLoaderV2();
   loadingBar.showLoading();
   const model = await loader.load(config.path, {
-    mips: settings.mips,
-    useEnvMap: settings.useEnvMap,
+    mips: true,
+    useEnvMap: true,
     onProgress: (name: string, percentage: number) => {
       loadingBar.setPercentage(percentage, name);
     },
@@ -193,8 +192,6 @@ export async function frame() {
   }
   light.flux = settings.flux;
   light_2.pos[1] = settings.posLightY;
-  model.mips = settings.mips;
-  model.useEnvMap = settings.useEnvMap;
   scene.hasEnvMap = settings.hasEnvMap;
   scene.render();
   changed = false;

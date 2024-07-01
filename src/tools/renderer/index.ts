@@ -120,7 +120,7 @@ export class WebGPURenderer {
       solidColorTexture: new SolidColorTextureCache(device),
       pipeline: new GPURenderPipelineCache(device),
       bindGroupLayout: new GPUBindGroupLayoutCache(device),
-      mipmap: new MipMap(device),
+      mipmap: new MipMap(device), // 只在 build 阶段开启
     };
     Object.assign(this, {
       ...gpuSupport,

@@ -145,9 +145,9 @@ export class Transform extends EntityObjectComponent {
   }
 
   updateWorldMatrix() {
-    const parent = this.object.parent?.matrix;
-    parent
-      ? mat4.multiply(parent, this.matrix, this.worldMatrix)
+    const parentWorldMatrix = this.object.parent?.worldMatrix;
+    parentWorldMatrix
+      ? mat4.multiply(parentWorldMatrix, this.matrix, this.worldMatrix)
       : mat4.copy(this.matrix, this.worldMatrix);
     mat4.inverse(this.worldMatrix, _matrix);
     mat4.transpose(_matrix, this.worldNormalMatrix);

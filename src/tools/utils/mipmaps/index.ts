@@ -60,6 +60,17 @@ export class MipMap {
     }
   }
 
+  reopen() {
+    this.commandEncoder = this.device.createCommandEncoder({
+      label: "mipmap command encoder",
+    });
+    this.computePass = this.commandEncoder.beginComputePass({
+      ...this.timeHelper?.timestampWrites,
+    });
+    this.needEndPass = true;
+    this.finished = false;
+  }
+
   tryEnd(closed: boolean = false) {
     if (this.needEndPass && closed && !this.finished) {
       this.computePass.end();
