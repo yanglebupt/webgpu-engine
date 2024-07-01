@@ -5,6 +5,7 @@ import { Scene } from "../../tools/scene";
 import { DirectionLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
 import { Logger } from "../../tools/helper";
+import { RotateScript } from "../18-自己的几何形状/RotateScript";
 
 const base = location.href;
 Logger.production = false;
@@ -30,10 +31,10 @@ const renderer = (await new WebGPURenderer()
   })) as WebGPURenderer;
 
 // 创建灯光
-const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 10);
+const light = new DirectionLight([-1, -1, -1], [1, 1, 1, 1], 8);
 
 // 创建场景对象，并指定环境贴图
-const scene = new Scene(renderer, {});
+const scene = new Scene(renderer);
 scene.add(light);
 
 // 创建相机和控制器
@@ -43,17 +44,21 @@ const camera = new PerspectiveCamera(
   config.near,
   config.far
 );
-camera.lookAt(config.eye, config.target);
+camera.lookAt(config.eye);
 const orbitController = new OrbitController(camera, renderer.canvas, {
   zoomSpeed: config.zoomSpeed,
 });
 scene.add(orbitController);
 
+let recordDom = document.createElement("div");
+recordDom.className = "record";
+document.body.appendChild(recordDom);
+
 // 加载 gltf 模型 或者 obj 模型
 const loader = new GLTFLoaderV2();
-const model = await loader.load(config.path);
-console.log(model);
-// model.addComponent(RotateScript, { stop: false });
+const model = await loader.load(config.path, { mips: true });
+model.addComponent(RotateScript, { stop: false });
+model.static = true;
 scene.add(model);
 
 export async function frame() {

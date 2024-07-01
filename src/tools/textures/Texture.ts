@@ -2,8 +2,9 @@ import {
   TextureSource,
   createTextureFromSource,
   getSizeFromSource,
+  numMipLevels,
 } from "webgpu-utils";
-import { maxMipLevelCount } from "../utils/mipmaps";
+import { MipMap, maxMipLevelCount } from "../utils/mipmaps";
 import { GPUSamplerCache } from "../scene/cache";
 import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 
@@ -40,24 +41,28 @@ export class Texture {
 
   upload(
     device: GPUDevice,
-    cached: GPUSamplerCache,
+    cached: { sampler: GPUSamplerCache; mipmap: MipMap },
     format?: GPUTextureFormat
   ) {
     if (format) this.format = format;
-    const [width, height] = getSizeFromSource(this.source, {});
+    const { sampler, mipmap } = cached;
+    const size = getSizeFromSource(this.source, {});
     this.sampler = this.samplerDescriptor
-      ? cached.get(this.samplerDescriptor)
-      : cached.default;
+      ? sampler.get(this.samplerDescriptor)
+      : sampler.default;
+
     this.texture = createTextureFromSource(device, this.source, {
       flipY: this.flipY,
       format: this.format,
       mips: false,
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
-        // GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.COPY_SRC,
-      mipLevelCount: this.mips ? maxMipLevelCount(width, height) : 1,
+      mipLevelCount: this.mips ? numMipLevels(size) : 1,
     });
+
+    if (this.mips) mipmap.generateMipmaps(this.texture);
   }
 }

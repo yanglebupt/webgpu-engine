@@ -13,6 +13,7 @@ import { GPUResource, GPUResourceView } from "./type";
 import { ResourceBuffer } from "./textures/ResourceBuffer";
 import { Type } from "./scene/types";
 import { wgsl } from "wgsl-preprocessor";
+import { MipMap } from "./utils/mipmaps";
 
 export interface GPUSupport {
   gpu: GPU;
@@ -319,7 +320,7 @@ export function getAddonBindGroupLayoutEntries(
 
 export function getResourcesfromViews(
   device: GPUDevice,
-  cached: { sampler: GPUSamplerCache },
+  cached: { sampler: GPUSamplerCache; mipmap: MipMap },
   resourceViews: Array<GPUResourceView> = []
 ) {
   return resourceViews.map((resourceView) => {
@@ -327,7 +328,10 @@ export function getResourcesfromViews(
       resourceView.upload(device);
       return resourceView.buffer;
     } else {
-      resourceView.upload(device, cached.sampler);
+      resourceView.upload(device, {
+        sampler: cached.sampler,
+        mipmap: cached.mipmap,
+      });
       return resourceView.texture.createView();
     }
   });

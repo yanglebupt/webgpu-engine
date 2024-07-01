@@ -1,7 +1,7 @@
 import { getBindGroupEntries } from "..";
 import { EntityObject } from "../entitys/EntityObject";
-import { Geometry, U16IndicesToU32Indices } from "../geometrys/Geometry";
-import { ShaderBuildResult, WatchAction } from "../materials/Material";
+import { Geometry } from "../geometrys/Geometry";
+import { ShaderBuildResult } from "../materials/Material";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions } from "../scene/types";
@@ -10,7 +10,18 @@ import vertex from "../shaders/vertex-wgsl/normal.wgsl";
 import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
 import { GPUResource } from "../type";
 import { getBlendFromPreset } from "../utils/Blend";
-import { ObservableActionParams, ObservableProxy } from "../utils/Observable";
+import {
+  ObservableActionParams,
+  ObservableProxy,
+  WatchPropertyKey,
+} from "../utils/Observable";
+
+export enum WatchAction {
+  Geometry = "buildGeometry",
+  Material = "buildMaterial",
+  Pipeline = "buildPipeline",
+  Component = "buildComponent",
+}
 
 /**
  * 与 Unity 不同的是，这里我们将 Mesh 认为是 EntityObject，而不是 Component
@@ -19,6 +30,11 @@ export class Mesh<
   G extends Geometry = Geometry,
   M extends MeshMaterial = MeshMaterial
 > extends EntityObject {
+  static watch: WatchPropertyKey = {
+    wireframe: [WatchAction.Geometry, WatchAction.Pipeline],
+    blending: [WatchAction.Pipeline],
+    blendingPreset: [WatchAction.Pipeline],
+  };
   public geometry: G;
   private _material: M;
   public type = "Mesh";
@@ -48,7 +64,6 @@ export class Mesh<
 
   private componentBuildResult!: {
     transformUniformValue: Float32Array;
-    transformUniform: GPUBuffer;
     vertexResources: GPUResource[];
   };
 
@@ -67,21 +82,28 @@ export class Mesh<
   constructor(geometry: G, material: M) {
     super();
     this.geometry = geometry;
-    this._material = new ObservableProxy(
+    this._material = this.observeMaterial(material);
+  }
+
+  private observeMaterial(material: M) {
+    return new ObservableProxy(
       material,
-      this.onChange.bind(this)
+      [
+        {
+          action: this.onChange.bind(this),
+          watch: Mesh.watch,
+        },
+      ],
+      { exclude: Object.keys(Mesh.watch) }
     ) as M;
   }
 
   get material() {
-    return this._material;
+    return this._material as M;
   }
 
-  set material(material: MeshMaterial) {
-    this._material = new ObservableProxy(
-      material,
-      this.onChange.bind(this)
-    ) as M;
+  set material(material: M) {
+    this._material = this.observeMaterial(material);
   }
 
   onChange({ payload }: ObservableActionParams) {
@@ -102,7 +124,7 @@ export class Mesh<
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
-    if (!this.static) this.updateBuffers(device);
+    super.render(renderPass, device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     renderPass.setPipeline(this.renderPipeline);
     if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
@@ -118,21 +140,20 @@ export class Mesh<
   }
 
   updateBuffers(device: GPUDevice) {
-    const { transformUniformValue, transformUniform } =
+    const { transformUniformValue, vertexResources } =
       this.componentBuildResult;
+    const transformUniform = vertexResources[0] as GPUBuffer;
     transformUniformValue.set(this.transform.worldMatrix, 0);
     transformUniformValue.set(this.transform.worldNormalMatrix, 16);
     device.queue.writeBuffer(transformUniform, 0, transformUniformValue);
-    this.material.update(device);
   }
 
   buildWireframe(device: GPUDevice) {
     const geometry = this.geometry;
     const { positions, indices, normals, uvs } = geometry.attributes;
-    const vertexCount = geometry.getCount("POSITION");
-    const hasIndices = !!indices;
-    const useNormal = !!normals;
-    const useTexcoord = !!uvs;
+    const vertexCount = !!indices
+      ? indices.length
+      : geometry.getCount("POSITION");
 
     const { vertexBindingStart: bindingStart } = this.materialBuildResult;
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
@@ -141,73 +162,37 @@ export class Mesh<
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       },
-      {
-        binding: bindingStart + 1,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      },
     ];
-
     const resources: GPUResource[] = [];
 
-    const positionsBuffer = device.createBuffer({
-      size: positions.byteLength,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    [positions, indices, normals, uvs].forEach((array, idx) => {
+      if (array === undefined) return;
+      const isIndex = idx === 1;
+      const buffer = device.createBuffer({
+        size: isIndex
+          ? array.length * Uint32Array.BYTES_PER_ELEMENT
+          : array.byteLength,
+        usage: GPUBufferUsage.STORAGE,
+        mappedAtCreation: true,
+      });
+      resources.push(buffer);
+      new (isIndex ? Uint32Array : Float32Array)(buffer.getMappedRange()).set(
+        array
+      );
+      buffer.unmap();
+
+      bindGroupLayoutEntries.push({
+        binding: bindingStart + idx + 1,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: "read-only-storage" },
+      });
     });
-    device.queue.writeBuffer(positionsBuffer, 0, positions);
-    resources.push(positionsBuffer);
-
-    if (hasIndices) {
-      const indicesU32 =
-        geometry.indexFormat === "uint16"
-          ? U16IndicesToU32Indices(indices as Uint16Array)
-          : indices;
-      const buffer = device.createBuffer({
-        size: indicesU32.byteLength,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-      });
-      device.queue.writeBuffer(buffer, 0, indicesU32);
-      resources.push(buffer);
-      bindGroupLayoutEntries.push({
-        binding: bindingStart + 2,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      });
-    }
-
-    if (useNormal) {
-      const buffer = device.createBuffer({
-        size: normals.byteLength,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-      });
-      device.queue.writeBuffer(buffer, 0, normals);
-      resources.push(buffer);
-      bindGroupLayoutEntries.push({
-        binding: bindingStart + 3,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      });
-    }
-
-    if (useTexcoord) {
-      const buffer = device.createBuffer({
-        size: uvs.byteLength,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-      });
-      device.queue.writeBuffer(buffer, 0, uvs);
-      resources.push(buffer);
-      bindGroupLayoutEntries.push({
-        binding: bindingStart + 4,
-        visibility: GPUShaderStage.VERTEX,
-        buffer: { type: "read-only-storage" },
-      });
-    }
 
     this.geometryBuildResult = {
-      vertexCount: (hasIndices ? indices.length : vertexCount) * 2,
+      vertexCount: vertexCount * 2,
       vertex: {
         code: wireframe,
-        context: { useNormal, useTexcoord, bindingStart },
+        context: { useNormal: !!normals, useTexcoord: !!uvs, bindingStart },
       },
       resources,
       indices: null,
@@ -226,10 +211,7 @@ export class Mesh<
     const arrayStride =
       Float32Array.BYTES_PER_ELEMENT *
       (3 + (useNormal ? 3 : 0) + (useTexcoord ? 2 : 0));
-    const vertexBuffer = device.createBuffer({
-      size: arrayStride * vertexCount,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
+
     const attributes: GPUVertexAttribute[] = [
       {
         shaderLocation: ShaderLocation.POSITION,
@@ -256,9 +238,14 @@ export class Mesh<
         attributes,
       },
     ];
-    const vertexData = new Float32Array(
-      vertexBuffer.size / Float32Array.BYTES_PER_ELEMENT
-    );
+
+    const vertexBuffer = device.createBuffer({
+      size: arrayStride * vertexCount,
+      usage: GPUBufferUsage.VERTEX,
+      mappedAtCreation: true,
+    });
+    const vertexData = new Float32Array(vertexBuffer.getMappedRange());
+
     for (let i = 0; i < vertexCount; i++) {
       const vertex = positions.slice(i * 3, (i + 1) * 3);
       const normal = useNormal ? normals.slice(i * 3, (i + 1) * 3) : [];
@@ -268,14 +255,19 @@ export class Mesh<
         (i * arrayStride) / Float32Array.BYTES_PER_ELEMENT
       );
     }
-    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+    vertexBuffer.unmap();
+
     let indexBuffer: GPUBuffer | null = null;
     if (indices) {
       indexBuffer = device.createBuffer({
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX,
+        usage: GPUBufferUsage.INDEX,
         size: indices.length * indices.BYTES_PER_ELEMENT,
+        mappedAtCreation: true,
       });
-      device.queue.writeBuffer(indexBuffer, 0, indices);
+      new (indexFormat === "uint16" ? Uint16Array : Uint32Array)(
+        indexBuffer.getMappedRange()
+      ).set(indices);
+      indexBuffer.unmap();
     }
 
     const { vertexBindingStart: bindingStart } = this.materialBuildResult;
@@ -313,11 +305,13 @@ export class Mesh<
     const transformUniformValue = new Float32Array(
       transformUniform.size / Float32Array.BYTES_PER_ELEMENT
     );
+
     this.componentBuildResult = {
-      transformUniform,
       transformUniformValue,
       vertexResources: [transformUniform],
     };
+
+    this.updateBuffers(device);
   }
 
   buildMaterial(options: BuildOptions) {

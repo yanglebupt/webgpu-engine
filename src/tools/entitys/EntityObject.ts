@@ -21,7 +21,8 @@ export abstract class EntityObject
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   abstract type: string;
-  static = false;
+  static = false; // 静态对象，不进行响应式，不会执行 update
+  active = true; // 不绘制，不会执行生命周期函数
   name: string = "";
   description: string = "";
   id = _objectId++;
@@ -34,7 +35,10 @@ export abstract class EntityObject
     Reflect.set(this.components, Transform.name, this.transform);
   }
 
-  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {}
+  abstract updateBuffers(device: GPUDevice): void;
+  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
+    if (!this.static) this.updateBuffers(device);
+  }
 
   build(options: BuildOptions) {
     this.children.forEach((child) => child.build(options));
@@ -48,9 +52,9 @@ export abstract class EntityObject
       construct,
       construct.prototype instanceof EntityObjectComponent ? [this] : []
     ) as Component;
-    callFunc(cpn, "awake");
     Object.assign(cpn, options);
     Reflect.set(this.components, construct.name, cpn);
+    if (cpn.active) callFunc(cpn, "awake");
     return cpn as InstanceType<C>;
   }
 

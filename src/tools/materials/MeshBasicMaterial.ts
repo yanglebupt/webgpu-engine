@@ -33,11 +33,16 @@ export class MeshBasicMaterial extends MeshMaterial {
     this.uniformValue = makeStructuredView(MeshBasicMaterial.defs.uniforms.uni);
   }
 
-  update(device: GPUDevice) {
+  onChange() {
+    if (!this.device) return;
     this.uniformValue.set({
       color: this.color,
     });
-    device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
+    this.device.queue.writeBuffer(
+      this.uniform,
+      0,
+      this.uniformValue.arrayBuffer
+    );
   }
 
   build({ device }: BuildOptions) {
@@ -52,7 +57,7 @@ export class MeshBasicMaterial extends MeshMaterial {
       size: this.uniformValue.arrayBuffer.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.update(device);
+    this.device = device;
     return {
       fragment: {
         resources: [this.uniform],

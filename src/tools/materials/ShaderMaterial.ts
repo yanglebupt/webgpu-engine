@@ -20,6 +20,7 @@ import {
 } from "..";
 import { ShaderBuildResult } from "./Material";
 import { GPUSamplerCache } from "../scene/cache";
+import { MipMap } from "../utils/mipmaps";
 
 // need inject in main function
 const defaultInstanceName = "instanceIndex";
@@ -72,9 +73,10 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
     return shaderCode;
   }
 
-  update(device: GPUDevice) {
-    updateResourceViews(device, this.resourceViews?.vertex);
-    updateResourceViews(device, this.resourceViews?.fragment);
+  onChange() {
+    if (!this.device) return;
+    updateResourceViews(this.device, this.resourceViews?.vertex);
+    updateResourceViews(this.device, this.resourceViews?.fragment);
   }
 
   buildShader(
@@ -82,7 +84,7 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
     visibility: GPUShaderStageFlags,
     startBinding: number,
     device: GPUDevice,
-    cached: { sampler: GPUSamplerCache },
+    cached: { sampler: GPUSamplerCache; mipmap: MipMap },
     resourceViews?: Array<GPUResourceView>
   ) {
     const bindGroupLayoutEntries = getAddonBindGroupLayoutEntries(
@@ -92,11 +94,7 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
       resourceViews
     );
 
-    const resources = getResourcesfromViews(
-      device,
-      { sampler: cached.sampler },
-      resourceViews
-    );
+    const resources = getResourcesfromViews(device, cached, resourceViews);
 
     let _shader;
     if (visibility === GPUShaderStage.FRAGMENT) {
@@ -140,13 +138,14 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
 
   build({ device, cached }: BuildOptions) {
     const { vertex, fragment } = this.resourceViews ?? {};
+    const subCached = { sampler: cached.sampler, mipmap: cached.mipmap };
 
     this.vertexBuildResult = this.buildShader(
       this.vertex,
       GPUShaderStage.VERTEX,
       0,
       device,
-      { sampler: cached.sampler },
+      subCached,
       vertex
     );
 
@@ -155,10 +154,10 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
       GPUShaderStage.FRAGMENT,
       0,
       device,
-      { sampler: cached.sampler },
+      subCached,
       fragment
     );
-    this.update(device);
+    this.device = device;
     return {
       fragment: this.fragmentBuildResult,
       vertex: this.vertexBuildResult,

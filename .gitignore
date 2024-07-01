@@ -16,6 +16,7 @@ pbr-shader
 geometry
 webgpu_wireframe_thicklines-master
 math-docs
+src/examples/测试
 
 # Editor directories and files
 .vscode/*

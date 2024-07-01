@@ -5,12 +5,12 @@ export type ObservableActionParams = {
   propertyKey: PropertyKey;
   newValue: any;
   oldValue: any;
-  payload: any;
+  payload?: any;
 };
 export type ObservableAction = (p: ObservableActionParams) => void;
+export type WatchPropertyKey = PropertyKey[] | { [key: PropertyKey]: any };
 export interface Observable {
-  watch: PropertyKey[] | { [key: PropertyKey]: any };
-  onChange?: ObservableAction;
+  onChange(p: ObservableActionParams): void;
 }
 
 /**
@@ -20,41 +20,54 @@ export interface Observable {
 
 Proxy.prototype = Object;
 export interface ObservableProxyOptions {
-  deep: boolean;
+  deep?: boolean;
+  watch?: PropertyKey[];
+  exclude?: PropertyKey[];
 }
 // @ts-ignore
 export class ObservableProxy<T extends Observable> extends Proxy<T> {
   constructor(
     object: T,
-    action?: ObservableAction,
-    options?: Partial<ObservableProxyOptions>
+    reactions?: Array<{ action: ObservableAction; watch?: WatchPropertyKey }>,
+    options?: ObservableProxyOptions
   ) {
+    const { watch, exclude } = options ?? {};
     super(object, {
       set(target, p, newValue, receiver) {
         const oldValue = Reflect.get(target, p, receiver);
         // @ts-ignore
         const flag = Reflect.set(...arguments);
-        const watchDescriptor = object.watch;
-        let changed = false;
-        let payload;
-        if (oldValue !== newValue) {
-          if (Array.isArray(watchDescriptor)) {
-            changed = watchDescriptor.includes(p);
-          } else {
-            changed = Object.hasOwn(watchDescriptor, p);
-            payload = watchDescriptor[p];
-          }
-        }
-        if (changed) {
-          const params = {
+        const changed = oldValue !== newValue;
+        if (!changed) return flag;
+        if (reactions)
+          reactions.forEach(({ action, watch }) => {
+            let needCall = false;
+            const params: ObservableActionParams = {
+              propertyKey: p,
+              newValue,
+              oldValue,
+            };
+
+            if (watch === undefined) {
+              // 默认监听全部属性
+              action(params);
+            } else {
+              if (Array.isArray(watch)) {
+                needCall = watch.includes(p);
+              } else {
+                needCall = Object.hasOwn(watch, p);
+                params.payload = watch[p];
+              }
+              if (needCall) action(params);
+            }
+          });
+
+        if (watch?.includes(p) || !exclude?.includes(p))
+          object.onChange({
             propertyKey: p,
             newValue,
             oldValue,
-            payload,
-          };
-          object.onChange && object.onChange(params);
-          action && action(params);
-        }
+          });
         return flag;
       },
     });

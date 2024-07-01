@@ -1,10 +1,9 @@
-import { CreateCanvasConfig, checkWebGPUSupported, createCanvas } from "..";
-import { StorageTextureToCanvas } from "../helper";
+import { checkWebGPUSupported, createCanvas } from "..";
 import { Scene } from "../scene";
 import { BuildCache } from "../scene/types";
 import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 import { EnvMap } from "../utils/envmap";
-import { getSizeForMipFromTexture } from "../utils/mipmaps";
+import { MipMap } from "../utils/mipmaps";
 import {
   GPUBindGroupLayoutCache,
   GPURenderPipelineCache,
@@ -56,7 +55,7 @@ export interface WebGPURenderer {
 
 export class WebGPURenderer {
   static features: GPUFeatureName[] = [];
-  cached?: BuildCache;
+  cached!: BuildCache;
   constructor(
     options?: Partial<{
       antialias: boolean;
@@ -121,6 +120,7 @@ export class WebGPURenderer {
       solidColorTexture: new SolidColorTextureCache(device),
       pipeline: new GPURenderPipelineCache(device),
       bindGroupLayout: new GPUBindGroupLayoutCache(device),
+      mipmap: new MipMap(device),
     };
     Object.assign(this, {
       ...gpuSupport,
@@ -202,7 +202,9 @@ export class WebGPURenderer {
   }
 
   render(scene: Scene) {
-    const encoder = this.device.createCommandEncoder();
+    const encoder = this.device.createCommandEncoder({
+      label: "render command encoder",
+    });
     this.renderScene(scene, encoder);
     this.device.queue.submit([encoder.finish()]);
     // destroyUnused
@@ -212,5 +214,6 @@ export class WebGPURenderer {
     if (!realtime && envMap) {
       envMap.done();
     }
+    this.cached.mipmap.tryEnd(true);
   }
 }

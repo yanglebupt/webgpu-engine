@@ -79,7 +79,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       {
         a: this.baseColorTexture,
         d: "opaqueWhiteTexture",
-        f: `${this.defaultFormat}-srgb`,
+        f: this.defaultFormat,
       },
       {
         a: this.normalTexture,
@@ -94,7 +94,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       {
         a: this.emissiveTexture,
         d: "transparentBlackTexture",
-        f: `${this.defaultFormat}-srgb`,
+        f: this.defaultFormat,
       },
       {
         a: this.occlusionTexture,
@@ -108,7 +108,8 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     }>;
   }
 
-  update(device: GPUDevice) {
+  onChange() {
+    if (!this.device) return;
     this.uniformValue.set({
       baseColorFactor: this.baseColorFactor,
       metallicFactor: this.metallicFactor,
@@ -120,7 +121,11 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       applyNormalMap: Number(this.applyNormalMap),
       useEnvMap: Number(this.useEnvMap),
     });
-    device.queue.writeBuffer(this.uniform, 0, this.uniformValue.arrayBuffer);
+    this.device.queue.writeBuffer(
+      this.uniform,
+      0,
+      this.uniformValue.arrayBuffer
+    );
   }
 
   build({ device, cached, scene }: BuildOptions) {
@@ -147,7 +152,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     });
     const texturesView = this.textures.map(({ a, d, f }) => {
       if (a) {
-        a.upload(device, cached.sampler, f);
+        a.upload(device, { sampler: cached.sampler, mipmap: cached.mipmap }, f);
         return a.texture.createView();
       } else {
         return cached.solidColorTexture
@@ -158,7 +163,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
           .createView();
       }
     });
-    this.update(device);
+    this.device = device;
     return {
       fragment: {
         resources: [this.uniform, ...texturesView, cached.sampler.default],

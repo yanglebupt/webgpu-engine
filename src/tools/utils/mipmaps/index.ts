@@ -3,6 +3,7 @@ import { createComputePipeline } from "../..";
 import { DispatchCompute } from "../Dispatch";
 import extract_mimmap from "./shaders/extract-mipmap.wgsl";
 import { Logger } from "../../helper";
+import TimeHelper from "../time-helper/TimeHelper";
 
 export function getSizeForMipFromTexture(
   size: [number, number] | number[],
@@ -12,17 +13,26 @@ export function getSizeForMipFromTexture(
 }
 
 export class MipMap {
-  public computePass: GPUComputePassEncoder;
-  public needEndPass: boolean;
-  public downsampler: WebGPUSinglePassDownsampler;
+  private computePass: GPUComputePassEncoder;
+  private needEndPass: boolean;
+  private downsampler: WebGPUSinglePassDownsampler;
+  private finished: boolean = false;
   public commandEncoder?: GPUCommandEncoder;
-  constructor(public device: GPUDevice, computePass?: GPUComputePassEncoder) {
+  constructor(
+    public device: GPUDevice,
+    computePass?: GPUComputePassEncoder,
+    public timeHelper?: TimeHelper
+  ) {
     if (computePass) {
       this.computePass = computePass;
       this.needEndPass = false;
     } else {
-      this.commandEncoder = device.createCommandEncoder();
-      this.computePass = this.commandEncoder.beginComputePass();
+      this.commandEncoder = device.createCommandEncoder({
+        label: "mipmap command encoder",
+      });
+      this.computePass = this.commandEncoder.beginComputePass({
+        ...this.timeHelper?.timestampWrites,
+      });
       this.needEndPass = true;
     }
     this.downsampler = new WebGPUSinglePassDownsampler();
@@ -50,10 +60,12 @@ export class MipMap {
     }
   }
 
-  tryEnd(closed: boolean = true) {
-    if (this.needEndPass && closed) {
+  tryEnd(closed: boolean = false) {
+    if (this.needEndPass && closed && !this.finished) {
       this.computePass.end();
+      this.timeHelper?.end(this.commandEncoder!);
       this.device.queue.submit([this.commandEncoder!.finish()]);
+      this.finished = true;
       Logger.log("closed mipmap pass");
     }
   }

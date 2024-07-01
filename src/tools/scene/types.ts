@@ -1,4 +1,5 @@
 import { Scene } from ".";
+import { MipMap } from "../utils/mipmaps";
 import {
   GPUBindGroupLayoutCache,
   GPURenderPipelineCache,
@@ -51,6 +52,7 @@ export interface BuildCache {
   solidColorTexture: SolidColorTextureCache;
   bindGroupLayout: GPUBindGroupLayoutCache;
   pipeline: GPURenderPipelineCache;
+  mipmap: MipMap;
 }
 export interface BuildOptions {
   device: GPUDevice;

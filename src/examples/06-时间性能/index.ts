@@ -8,7 +8,7 @@ import fragment from "./shaders/frag.wgsl?raw";
 import { createCircleVertices } from "./data";
 import { mod, rand } from "../../tools/math";
 import { GUI } from "dat.gui";
-import TimeHelper from "./TimeHelper";
+import TimeHelper from "../../tools/utils/time-helper/TimeHelper";
 
 const { device, format } = await checkWebGPUSupported(
   {},

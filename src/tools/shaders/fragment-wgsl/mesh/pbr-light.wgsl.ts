@@ -54,11 +54,11 @@ ${MaterialUniform}
 @group(2) @binding(6) var materialSampler: sampler;
 
 fn lin2rgb(lin: vec3f) -> vec3f {
-  return pow(lin, vec3f(1.0/2.2));
+  return select(1.055*(pow( lin, vec3f(0.41666) )) - 0.055, lin*12.92, lin<vec3f(0.0031308));
 }
 
 fn rgb2lin(rgb: vec3f) -> vec3f {
-  return pow(rgb, vec3f(2.2));
+  return select(pow(rgb * 0.9478672986 + 0.0521327014, vec3f(2.4)), rgb * 0.0773993808, rgb<vec3f(0.04045));
 }
 
 // from http://www.thetenthplanet.de/archives/1180

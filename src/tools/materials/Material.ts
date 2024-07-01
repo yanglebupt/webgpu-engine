@@ -1,18 +1,7 @@
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions } from "../scene/types";
 import { GPUResource } from "../type";
-import { Observable } from "../utils/Observable";
-
-export enum WatchAction {
-  Geometry = "buildGeometry",
-  Material = "buildMaterial",
-  Pipeline = "buildPipeline",
-  Component = "buildComponent",
-}
-
-export interface WatchPropertyKey {
-  [key: PropertyKey]: WatchAction[];
-}
+import { Observable, ObservableActionParams } from "../utils/Observable";
 
 export interface ShaderBuildResult {
   bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
@@ -21,8 +10,8 @@ export interface ShaderBuildResult {
 }
 
 export abstract class Material implements Observable {
-  abstract watch: WatchPropertyKey;
-  abstract update(device: GPUDevice): void;
+  protected device!: GPUDevice;
+  abstract onChange(p: ObservableActionParams): void;
   abstract build(options: BuildOptions): {
     vertex?: ShaderBuildResult;
     fragment: ShaderBuildResult;

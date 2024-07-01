@@ -52,7 +52,7 @@ export class Scene implements Renderable {
       device: this.device,
       format: this.renderer.format,
       depthFormat: this.renderer.depthFormat,
-      cached: this.renderer.cached!,
+      cached: this.renderer.cached,
       scene: this,
       antialias: this.renderer.antialias,
       alphaMode: this.renderer.alphaMode,
@@ -227,13 +227,14 @@ export class Scene implements Renderable {
     t: number
   ) {
     if (child instanceof EntityObject) {
+      if (!child.active) return;
       Object.values(Reflect.get(child, "components")).forEach((cpn) => {
-        if (cpn instanceof Component) {
+        if (cpn instanceof Component && cpn.active) {
           if (!Reflect.get(cpn, "isStarted")) {
             callFunc(cpn, "start");
             Reflect.set(cpn, "isStarted", true);
           }
-          callFunc(cpn, "update", [dt, t]);
+          if (!child.static) callFunc(cpn, "update", [dt, t]);
         }
       });
       child.children.forEach((child) =>

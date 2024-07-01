@@ -93,7 +93,7 @@ export default class TimeHelper {
   fps = 0;
   jsTime = 0;
   gpuTime = -1;
-  private infoElem: HTMLPreElement;
+  private infoElem?: HTMLPreElement;
   private timeConfigMap: Map<string, RollingAverage> = new Map<
     string,
     RollingAverage
@@ -101,10 +101,12 @@ export default class TimeHelper {
   private jsTimeStart = 0;
   private gpuTimeHelper: GPUTimeHelper | null = null;
 
-  constructor(devide: GPUDevice, numSamples: number = 30) {
-    this.infoElem = document.createElement("pre");
-    this.infoElem.id = "TimeHelper";
-    document.body.appendChild(this.infoElem);
+  constructor(
+    devide: GPUDevice,
+    createElement: boolean = true,
+    numSamples: number = 30
+  ) {
+    if (createElement) this.infoElem = TimeHelper.createDomElement();
     TimeHelper.TimeConfigNames.forEach((configName) =>
       this.timeConfigMap.set(configName, new RollingAverage(numSamples))
     );
@@ -117,6 +119,13 @@ export default class TimeHelper {
         "device feature `timestamp-query` for GPU time is not supported. Please check if you request this feature when adapter.requestDevice"
       );
     }
+  }
+
+  static createDomElement() {
+    const infoElem = document.createElement("pre");
+    infoElem.id = "TimeHelper";
+    document.body.appendChild(infoElem);
+    return infoElem;
   }
 
   record(now: number) {
@@ -145,9 +154,13 @@ export default class TimeHelper {
       this.gpuTime = this.timeConfigMap.get("gpuTime")?.value || -1;
     }
 
-    this.infoElem.textContent = `fps: ${this.fps.toFixed(fractionDigits)}
-js: ${this.jsTime.toFixed(fractionDigits)}ms
-gpu: ${this.gpuTime > 0 ? `${this.gpuTime.toFixed(fractionDigits)}µs` : "N/A"}`;
+    if (this.infoElem)
+      //       this.infoElem.textContent = `fps: ${this.fps.toFixed(fractionDigits)}
+      // js: ${this.jsTime.toFixed(fractionDigits)}ms
+      // gpu: ${this.gpuTime > 0 ? `${this.gpuTime.toFixed(fractionDigits)}µs` : "N/A"}`;
+      this.infoElem.textContent = `gpu: ${
+        this.gpuTime > 0 ? `${this.gpuTime.toFixed(fractionDigits)}µs` : "N/A"
+      }`;
   }
 
   get timestampWrites() {

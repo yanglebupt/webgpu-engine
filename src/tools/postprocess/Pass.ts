@@ -39,7 +39,7 @@ export abstract class Pass<
   build({ device, cached }: BuildOptions, descriptor: GPUTextureDescriptor) {
     this.resources = getResourcesfromViews(
       device,
-      { sampler: cached.sampler },
+      { sampler: cached.sampler, mipmap: cached.mipmap },
       this.resourceViews
     );
   }
