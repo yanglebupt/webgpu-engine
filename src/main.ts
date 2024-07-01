@@ -16,8 +16,8 @@
 // import { frame } from "./examples/15-IBL-BRDF 重要性采样";
 // import { frame } from "./examples/16-IBL-重要性采样";
 // import { frame } from "./examples/17-自己的mipmap类";
-import { frame } from "./examples/18-自己的几何形状/";
-// import { frame } from "./examples/19-重构 GLTFLoader";
+// import { frame } from "./examples/18-自己的几何形状/";
+import { frame } from "./examples/19-重构 GLTFLoader";
 // import { frame } from "./examples/20-响应式属性变化";
 // import { frame } from "./examples/测试/mipmap 生成方法的性能对比/spd";
 // import { frame } from "./examples/测试/mipmap 生成方法的性能对比/spd-2";

@@ -18,3 +18,6 @@ export interface BuiltRenderPipelineOptions {
   useEnvMap?: boolean;
   onProgress?: (name: string, percentage: number) => void;
 }
+
+export const lossColor = [1, 0, 0, 1];
+export const defaultColor = [0.4, 0.4, 0.4, 1];

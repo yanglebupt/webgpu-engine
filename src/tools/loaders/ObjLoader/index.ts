@@ -7,9 +7,7 @@ import { Logger } from "../../helper";
 import { Texture } from "../../textures/Texture";
 import { Group } from "../../objects/Group";
 import { EntityObject } from "../../entitys/EntityObject";
-
-const lossColor = [1, 0, 0, 1];
-const defaultColor = [1, 1, 1, 1];
+import { defaultColor, lossColor } from "..";
 
 function tryWrapGroup(objects: EntityObject[]) {
   return objects.length > 1 ? new Group(objects) : objects[0];

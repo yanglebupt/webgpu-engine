@@ -1,5 +1,9 @@
 import { Mat4, mat4 } from "wgpu-matrix";
-import { BuiltRenderPipelineOptions, CreateAndSetRecord } from "..";
+import {
+  BuiltRenderPipelineOptions,
+  CreateAndSetRecord,
+  defaultColor,
+} from "..";
 import vertex from "../../shaders/vertex-wgsl/normal.wgsl";
 import { ShaderLocation } from "../../shaders";
 import { fetchWithProgress } from "../../common";
@@ -13,6 +17,9 @@ import { MeshPhysicalMaterial } from "../../materials/MeshPhysicalMaterial";
 import { getBindGroupEntries } from "../..";
 import { Texture, TextureOptions } from "../../textures/Texture";
 import { isEqual } from "lodash-es";
+import { ObservableProxy } from "../../utils/Observable";
+import { MeshMaterial } from "../../materials/MeshMaterial";
+import { MeshBasicMaterial } from "../../materials/MeshBasicMaterial";
 
 export function hexCharCodeToAsciiStr(hexcharCode: string | number) {
   if (typeof hexcharCode === "number") hexcharCode = hexcharCode.toString(16);
@@ -344,7 +351,7 @@ export class GLTFLoaderV2 {
     // 解析
     const materials =
       json.materials?.map(
-        (material) => new GLTFMaterial(material, textures, useEnvMap)
+        (material) => new GLTFPhysicalMaterial(material, textures, useEnvMap)
       ) ?? [];
 
     const meshes = json.meshes.map((mesh, idx) => {
@@ -375,9 +382,11 @@ export class GLTFLoaderV2 {
           indices,
           topology,
           attributeAccessors,
-          primitive.material !== undefined
-            ? materials[primitive.material]
-            : undefined,
+          new ObservableProxy(
+            primitive.material !== undefined
+              ? materials[primitive.material]
+              : new GLTFBasicMaterial()
+          ),
           primitive
         );
       });
@@ -426,14 +435,13 @@ export interface RenderInstance {
 export interface RenderNode {
   groupIndex: number;
   bindGroup: GPUBindGroup;
-  primitive: GLTFPrimitive;
 }
 
 export interface PrimitiveInstancesType {
   total: number;
   offset: number;
   matrices: Map<string, Transform[]>;
-  arrayBuffer: Float32Array;
+  arrayBuffer?: Float32Array;
 }
 export interface GLTFScene {
   device: GPUDevice;
@@ -490,8 +498,6 @@ export class GLTFScene extends Group {
       total: 0, // 一共多少个 primitive，包括被 node 重复也需要计入
       offset: 0,
       matrices: primitiveNodesMap,
-      // @ts-ignore
-      arrayBuffer: null,
     };
 
     // tranverse node
@@ -547,9 +553,9 @@ export class GLTFScene extends Group {
           indices,
           vertexCount,
           fragment: { resources, bindGroupLayoutEntries, shader },
-        } = a_primitive.build(options)!;
+        } = a_primitive.build(options);
 
-        const materialKey = JSON.stringify(a_primitive.a_material?.__json);
+        const materialKey = JSON.stringify(a_primitive.a_material.__json);
         let material = materialCache.get(materialKey);
         const materialBindGroupLayout = cached.bindGroupLayout.get(
           bindGroupLayoutEntries
@@ -561,7 +567,6 @@ export class GLTFScene extends Group {
               layout: materialBindGroupLayout,
               entries: getBindGroupEntries(resources),
             }),
-            primitive: a_primitive,
           };
           this.record && this.record.bindGroupCount++;
           materialCache.set(materialKey, material);
@@ -571,7 +576,7 @@ export class GLTFScene extends Group {
         const ks = JSON.stringify({
           ...args,
           shaderContext: { vertex: vertex.context, fragment: shader.context },
-        });
+        }); // 这里能改变的就是这些属性了，其他都不会变了，因此 key 没必要弄太复杂
         let renderPipeline = this.renderPipelines.get(ks);
         if (!renderPipeline) {
           const pipeline = cached.pipeline.get(
@@ -628,6 +633,7 @@ export class GLTFScene extends Group {
 
     this.primitiveInstances = primitiveInstances;
     this.instanceBuffer = instanceBuffer;
+    this.device = device;
   }
 
   private traverseNode(node: GLTFNode, callback?: (node: GLTFNode) => void) {
@@ -666,6 +672,7 @@ export class GLTFScene extends Group {
   }
 
   updateBuffers() {
+    if (!this.primitiveInstances.arrayBuffer) return;
     this.primitiveInstances.offset = 0;
     this.a_meshs.forEach((a_mesh) => {
       a_mesh.a_primitives.forEach((a_primitive) => {
@@ -750,8 +757,8 @@ export class GLTFNode extends EntityObject {
     this.name = node.name;
     this.transform.applyMatrix4(readNodeTransform(node), true);
   }
-  updateBuffers(device: GPUDevice) {}
-  build(options: BuildOptions) {}
+  updateBuffers() {}
+  build() {}
 }
 
 // gltf mesh ：遍历，为每个 primitive 创建对应的渲染管线
@@ -767,7 +774,6 @@ export interface GPUBufferAccessor {
 }
 // gltf primitive ：创建对应的渲染管线和渲染过程
 export class GLTFPrimitive {
-  public renderPipeline: GPURenderPipeline | null = null;
   public vertexCount: number = 0;
   public bufferLayout: GPUVertexBufferLayout[] = [];
   public gpuBuffers: GPUBufferAccessor[] = [];
@@ -775,7 +781,7 @@ export class GLTFPrimitive {
     public a_indices: GLTFAccessor | null,
     public topology: GLTFRenderMode,
     public attributeAccessors: AttributeAccessor[],
-    public a_material: GLTFMaterial | undefined,
+    public a_material: GLTFMaterial,
     public __json: GLTFPrimitive
   ) {
     Object.assign(this, this.__json);
@@ -796,8 +802,8 @@ export class GLTFPrimitive {
       args: {
         primitive,
         bufferLayout: this.bufferLayout,
-        alphaMode: this.a_material?.alphaMode,
-        doubleSided: this.a_material?.doubleSided,
+        alphaMode: this.a_material.alphaMode,
+        doubleSided: this.a_material.doubleSided,
       },
       vertex: {
         code: vertex,
@@ -893,10 +899,9 @@ export class GLTFPrimitive {
 
   // 设置 material，有些 primitive 可以不存在 material
   build(options: BuildOptions) {
-    if (!this.a_material) return; // TODO: 设置没有 a_material 的默认值
     const vertexRes = this.buildVertex();
     const fragmentRes = this.a_material.build(options);
-    return { ...vertexRes, ...fragmentRes };
+    return { ...vertexRes, fragment: { ...fragmentRes.fragment } };
   }
 }
 
@@ -1075,7 +1080,15 @@ export class GLTFTexture extends Texture {
   }
 }
 
-export class GLTFMaterial extends MeshPhysicalMaterial {
+export interface GLTFMaterial extends MeshMaterial {
+  alphaMode: BlendMode;
+  doubleSided: boolean;
+  __json: Record<string, any>;
+}
+export class GLTFPhysicalMaterial
+  extends MeshPhysicalMaterial
+  implements GLTFMaterial
+{
   alphaMode: BlendMode;
   doubleSided: boolean;
   constructor(
@@ -1129,5 +1142,21 @@ export class GLTFMaterial extends MeshPhysicalMaterial {
         Reflect.set(this, k, this.a_textures[a.index!]);
       }
     });
+  }
+}
+
+export class GLTFBasicMaterial
+  extends MeshBasicMaterial
+  implements GLTFMaterial
+{
+  alphaMode: BlendMode;
+  doubleSided: boolean;
+  __json: Record<string, any>;
+
+  constructor() {
+    super({ color: defaultColor });
+    this.alphaMode = "OPAQUE";
+    this.doubleSided = false;
+    this.__json = {};
   }
 }

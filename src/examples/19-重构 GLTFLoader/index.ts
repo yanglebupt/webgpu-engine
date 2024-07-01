@@ -58,7 +58,6 @@ document.body.appendChild(recordDom);
 const loader = new GLTFLoaderV2();
 const model = await loader.load(config.path, { mips: true });
 model.addComponent(RotateScript, { stop: false });
-model.static = true;
 scene.add(model);
 
 export async function frame() {
