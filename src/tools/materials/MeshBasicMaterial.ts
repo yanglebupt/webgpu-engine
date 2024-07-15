@@ -58,6 +58,7 @@ export class MeshBasicMaterial extends MeshMaterial {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.device = device;
+    this.onChange();
     return {
       fragment: {
         resources: [this.uniform],

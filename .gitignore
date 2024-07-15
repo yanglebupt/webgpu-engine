@@ -17,6 +17,7 @@ geometry
 webgpu_wireframe_thicklines-master
 math-docs
 src/examples/测试
+error
 
 # Editor directories and files
 .vscode/*

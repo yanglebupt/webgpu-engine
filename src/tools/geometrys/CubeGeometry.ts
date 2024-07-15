@@ -20,9 +20,9 @@ export class CubeGeometry extends Geometry {
   constructor(options?: Partial<CubeGeometry>) {
     super();
     Object.assign(this, {
-      width: 1,
-      height: 1,
-      depth: 1,
+      width: 2,
+      height: 2,
+      depth: 2,
       widthSegments: 1,
       heightSegments: 1,
       depthSegments: 1,

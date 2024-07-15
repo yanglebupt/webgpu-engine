@@ -33,6 +33,11 @@ export class ObservableProxy<T extends Observable> extends Proxy<T> {
   ) {
     const { watch, exclude } = options ?? {};
     super(object, {
+      get(target, p, receiver) {
+        if (p === "__raw") return target;
+        // @ts-ignore
+        else return Reflect.get(...arguments);
+      },
       set(target, p, newValue, receiver) {
         const oldValue = Reflect.get(target, p, receiver);
         // @ts-ignore

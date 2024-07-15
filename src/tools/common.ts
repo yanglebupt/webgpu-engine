@@ -78,3 +78,21 @@ export const fetchWithProgress = async (
     throw new Error(`${response.status}: ${response.statusText}`);
   }
 };
+
+/** 多继承实现
+interface Foo extends Mix, Mix2 {}
+class Foo {}
+applyMixins(Foo, [Mix, Mix2]); 
+ */
+export function applyMixins(derivedCtor: any, constructors: any[]) {
+  constructors.forEach((baseCtor) => {
+    Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
+      Object.defineProperty(
+        derivedCtor.prototype,
+        name,
+        Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ||
+          Object.create(null)
+      );
+    });
+  });
+}

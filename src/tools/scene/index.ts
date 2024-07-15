@@ -24,6 +24,7 @@ export interface SceneOption {
   realtime?: boolean;
   envMap?: EnvMap;
   showEnvMap?: boolean;
+  development?: boolean;
 }
 
 export class Scene implements Renderable {
@@ -46,7 +47,7 @@ export class Scene implements Renderable {
   public clock: Clock = new Clock();
 
   constructor(public renderer: WebGPURenderer, options?: SceneOption) {
-    this.options = { showEnvMap: true, ...options };
+    this.options = { showEnvMap: true, development: true, ...options };
     this.device = renderer.device;
     this.buildOptions = {
       device: this.device,
@@ -233,6 +234,7 @@ export class Scene implements Renderable {
           if (!Reflect.get(cpn, "isStarted")) {
             callFunc(cpn, "start");
             Reflect.set(cpn, "isStarted", true);
+            if (this.options.development) callFunc(cpn, "helper", [this]);
           }
           if (!child.static) callFunc(cpn, "update", [dt, t]);
         }

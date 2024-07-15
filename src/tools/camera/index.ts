@@ -1,4 +1,4 @@
-import { Mat4, Vec3, mat4, vec3 } from "wgpu-matrix";
+import { Mat4, Vec2, Vec3, mat4, vec2, vec3 } from "wgpu-matrix";
 import ArcballCamera from "./arcball";
 import {
   ShaderDataDefinitions,
@@ -53,6 +53,33 @@ export class Camera implements VirtualView {
       viewMatrix: this.viewMatrix,
       cameraPosition: this.cameraPosition,
     };
+  }
+
+  // screen 是 viewport 视角下的坐标 [-1,1]
+  screenToWorldPoint(x: number, y: number, z = 1) {
+    const tmp = vec3.create(0, 0, z);
+    this.project(tmp);
+
+    const res = vec3.create(x, y, tmp[2]);
+    this.unproject(res);
+    res[2] = z;
+    return res;
+  }
+
+  worldToScreenPoint(pos: Vec3) {
+    this.project(pos);
+    return vec2.create(pos[0], pos[1]);
+  }
+
+  project(pos: Vec3) {
+    const m = mat4.multiply(this.matrix, this.viewMatrix);
+    vec3.transformMat4(pos, m, pos);
+  }
+
+  unproject(pos: Vec3) {
+    const m = mat4.multiply(this.matrix, this.viewMatrix);
+    mat4.inverse(m, m);
+    vec3.transformMat4(pos, m, pos);
   }
 }
 

@@ -21,7 +21,7 @@ export abstract class EntityObject
     Renderable<(renderPass: GPURenderPassEncoder, device: GPUDevice) => void>
 {
   abstract type: string;
-  static = false; // 静态对象，不进行响应式，不会执行 update
+  private __static = false; // 静态对象，不进行响应式，不会执行 update
   active = true; // 不绘制，不会执行生命周期函数
   name: string = "";
   description: string = "";
@@ -33,6 +33,14 @@ export abstract class EntityObject
   constructor() {
     this.transform = new Transform(this);
     Reflect.set(this.components, Transform.name, this.transform);
+  }
+
+  get static() {
+    return this.__static;
+  }
+
+  set static(__static: boolean) {
+    this.__static = __static;
   }
 
   abstract updateBuffers(device: GPUDevice): void;

@@ -1,7 +1,6 @@
-import { Mat4, Quat, Vec3, mat4, quat, vec3 } from "wgpu-matrix";
+import { Mat4, Quat, Vec3, mat3, mat4, quat } from "wgpu-matrix";
 
-const _v1 = vec3.create();
-const _m1 = mat4.create();
+const _m1 = mat3.create();
 
 mat4.fromRotationTranslationScale = (
   q: Quat,
@@ -74,7 +73,7 @@ mat4.decompose = (m: Mat4, q: Quat, v: Vec3, s: Vec3) => {
   v[2] = m[14];
 
   // scale the rotation part
-  mat4.copy(m, _m1);
+  mat3.fromMat4(m, _m1);
 
   const invSX = 1 / sx;
   const invSY = 1 / sy;

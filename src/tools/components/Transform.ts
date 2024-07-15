@@ -134,7 +134,7 @@ export class Transform extends EntityObjectComponent {
     return this.translateOnAxis(_zAxis, distance);
   }
 
-  update() {
+  protected update() {
     mat4.fromRotationTranslationScale(
       this.quaternion.elements,
       this.position,

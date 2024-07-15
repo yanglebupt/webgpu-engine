@@ -164,6 +164,7 @@ export class MeshPhysicalMaterial extends MeshMaterial {
       }
     });
     this.device = device;
+    this.onChange();
     return {
       fragment: {
         resources: [this.uniform, ...texturesView, cached.sampler.default],

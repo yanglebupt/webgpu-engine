@@ -1,4 +1,5 @@
 import { EntityObject } from "../entitys/EntityObject";
+import { Scene } from "../scene";
 import { Transform } from "./Transform";
 
 type ComponentConstructor = new () => Component;
@@ -13,6 +14,7 @@ export abstract class Component {
   protected update(dt: number, t: number) {}
   protected enable() {}
   protected disable() {}
+  protected helper(scene: Scene) {} /* 方便为场景添加辅助对象，生成环境关闭 */
 
   get active() {
     return this.__active;

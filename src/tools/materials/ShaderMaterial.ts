@@ -41,6 +41,7 @@ export interface ShaderMaterial {
   };
 }
 
+// TODO：暂不支持 wireframe 模式需要注入更多属性
 export class ShaderMaterial extends MeshMaterial {
   static InjectVertexShaderCode = (
     bindingStart: number
@@ -158,6 +159,7 @@ ${MTransformationMatrixGroupBinding(bindingStart)}`;
       fragment
     );
     this.device = device;
+    this.onChange();
     return {
       fragment: this.fragmentBuildResult,
       vertex: this.vertexBuildResult,
