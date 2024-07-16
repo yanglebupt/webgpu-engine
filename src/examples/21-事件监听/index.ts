@@ -17,6 +17,7 @@ import { CylinderGeometry } from "../../tools/geometrys/CylinderGeometry";
 import { CircleGeometry } from "../../tools/geometrys/CircleGeometry";
 import { Component } from "../../tools/components/Component";
 import { OBBCollider } from "../../tools/components/colliders/OBBCollider";
+import { SphereCollider } from "../../tools/components/colliders/SphereCollider";
 
 Logger.production = true;
 
@@ -47,9 +48,7 @@ const mesh = new Mesh(new TorusGeometry(), new MeshBasicMaterial());
 mesh.addComponent(RotateScript, { stop: false });
 mesh.addComponent(Box3Collider, { visible: true });
 mesh.addComponent(OBBCollider, { visible: true });
-
-// const cpn = mesh.addComponent(SphereCollider);
-// cpn.visible = true;
+mesh.addComponent(SphereCollider, { visible: true });
 
 scene.add(mesh);
 

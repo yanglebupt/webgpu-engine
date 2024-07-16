@@ -3,7 +3,6 @@ import { Geometry } from "../../geometrys/Geometry";
 import { BufferGeometry } from "../../geometrys/BufferGeometry";
 import { Scene } from "../../scene";
 import { Line } from "../../objects/Line";
-import { MeshBasicMaterial } from "../../materials/MeshBasicMaterial";
 import { Box3 } from "../../maths/Box3";
 import { OBB } from "../../maths/OBB";
 import { Collider } from "./Collider";
@@ -41,7 +40,7 @@ export class OBBCollider extends Collider {
           6,
         ],
       }),
-      new MeshBasicMaterial({ color: [1, 1, 0, 1] })
+      Collider.material
     );
     scene.add(this.visibleObject);
   }

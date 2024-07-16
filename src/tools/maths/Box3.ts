@@ -64,6 +64,8 @@ export class Box3 extends Box3Data {
   }
 
   setFromBufferAttribute(positions: BufferAttribute<Float32Array>) {
+    this.makeEmpty();
+
     for (let i = 0, n = positions.count; i < n; i++) {
       const pos = positions.get(i);
       this.expandByPoint(vec3.set(pos[0], pos[1], pos[2], _vector));
@@ -144,9 +146,9 @@ export class Box3 extends Box3Data {
 
     mat3.fromMat4(matrix, _m);
     mat4.getTranslation(matrix, _vector);
-    const oriBox = this.init ?? this;
-    const _min = oriBox.min;
-    const _max = oriBox.max;
+    const ori = this.init ?? this;
+    const _min = ori.min;
+    const _max = ori.max;
 
     /* Now find the extreme points by considering the product of the */
     /* min and max with each component of M.  */
@@ -168,6 +170,9 @@ export class Box3 extends Box3Data {
     /*
       但是物体变换，一定会导致 box 变化吗 ??  显然不一定, 例如球旋转
       如果此时将变换作用到 box 则会导致出现很多空隙，此时需要用其他例如 SphereCollider
+
+      如果想要精确的 box，必须对每个顶点做变换，然后重新计算 min 和 max，显然对于顶点数很多模型，不能这么做
+      但是我们可以在第一次计算 box 的时候，计算出顶点的 凸集（ConvexHull）（最外围的点集），后面只需要对 凸集 中的点进行变换即可
     */
   }
 }

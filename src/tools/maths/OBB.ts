@@ -39,11 +39,11 @@ export class OBB extends OBBData {
   }
 
   applyMatrix4(matrix: Mat4) {
-    const oriObb = this.init ?? this;
+    const ori = this.init ?? this;
     mat4.decompose(matrix, _q, _v1, _v2);
     mat3.fromQuat(_q, _m);
-    vec3.add(_v1, oriObb.center, this.center);
-    vec3.mul(_v2, oriObb.halfSize, this.halfSize);
-    mat3.multiply(_m, oriObb.rotation, this.rotation);
+    vec3.add(_v1, ori.center, this.center);
+    vec3.mul(_v2, ori.halfSize, this.halfSize);
+    mat3.multiply(_m, ori.rotation, this.rotation);
   }
 }

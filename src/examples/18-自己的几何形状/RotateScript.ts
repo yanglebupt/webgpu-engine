@@ -13,6 +13,8 @@ export class RotateScript extends EntityObjectComponent<Mesh> {
     );
     // this.transform.rotateY(dt * this.speed);
     this.transform.position[0] = Math.sin(t * this.speed);
-    this.transform.scale[0] = 0.5 + 0.5 * Math.sin(t * this.speed);
+    for (let i = 0; i < 3; i++) {
+      this.transform.scale[i] = 0.8 + 0.5 * Math.sin(t * this.speed);
+    }
   }
 }

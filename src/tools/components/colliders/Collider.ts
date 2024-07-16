@@ -2,9 +2,20 @@ import { EntityObject } from "../../entitys/EntityObject";
 import { Geometry } from "../../geometrys/Geometry";
 import { Object3D } from "../../objects/Object3D";
 import { EntityObjectComponent } from "../Component";
+import { MeshBasicMaterial } from "../../materials/MeshBasicMaterial";
+import { Scene } from "../../scene";
 
+// 所有的 Collider 可以共用一个 material
 export abstract class Collider extends EntityObjectComponent {
+  static material: MeshBasicMaterial;
+  static {
+    Collider.material = new MeshBasicMaterial({
+      color: [1, 1, 0, 1],
+      wireframe: true,
+    });
+  }
   visible = false;
+  // color: Vec4 = [1, 1, 0, 1];
   protected visibleObject: Object3D | null = null;
 
   constructor(public object: EntityObject) {
@@ -14,6 +25,13 @@ export abstract class Collider extends EntityObjectComponent {
       throw new Error("Can not add collider to an object without geometry!!");
     }
   }
+
+  // protected start() {
+  //   this.material.color = this.color;
+  //   this.material.onChange();
+  // }
+
+  protected abstract helper(scene: Scene): void;
 
   abstract updateVisible(): void;
 

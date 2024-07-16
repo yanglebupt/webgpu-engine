@@ -14,7 +14,9 @@ export abstract class Component {
   protected update(dt: number, t: number) {}
   protected enable() {}
   protected disable() {}
-  protected helper(scene: Scene) {} /* 方便为场景添加辅助对象，生成环境关闭 */
+  protected helper(
+    scene: Scene
+  ) {} /* start 之后调用，方便为场景添加辅助对象，生成环境关闭 */
 
   get active() {
     return this.__active;
