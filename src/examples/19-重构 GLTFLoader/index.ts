@@ -1,11 +1,12 @@
 import { degToRad } from "../../tools/math";
 import { GLTFLoaderV2 } from "../../tools/loaders/GLTFLoader-v2";
-import { OrbitController, PerspectiveCamera } from "../../tools/camera";
+import { PerspectiveCamera } from "../../tools/cameras/Camera";
 import { Scene } from "../../tools/scene";
 import { DirectionLight } from "../../tools/lights";
 import { WebGPURenderer } from "../../tools/renderer";
 import { Logger } from "../../tools/helper";
 import { RotateScript } from "../18-自己的几何形状/RotateScript";
+import { ArcballController } from "../../tools/cameras/ArcballController";
 
 const base = location.href;
 Logger.production = false;
@@ -45,10 +46,12 @@ const camera = new PerspectiveCamera(
   config.far
 );
 camera.lookAt(config.eye);
-const orbitController = new OrbitController(camera, renderer.canvas, {
-  zoomSpeed: config.zoomSpeed,
-});
-scene.add(orbitController);
+const arcball = new ArcballController(
+  camera,
+  renderer.canvas,
+  config.zoomSpeed
+);
+scene.add(arcball);
 
 let recordDom = document.createElement("div");
 recordDom.className = "record";

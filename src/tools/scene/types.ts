@@ -1,5 +1,5 @@
 import { Scene } from ".";
-import { Camera } from "../camera";
+import { Camera } from "../cameras/Camera";
 import { MipMap } from "../utils/mipmaps";
 import {
   GPUBindGroupLayoutCache,

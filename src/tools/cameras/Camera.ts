@@ -1,5 +1,4 @@
-import { Mat4, Vec2, Vec3, mat4, vec2, vec3 } from "wgpu-matrix";
-import ArcballCamera from "./arcball";
+import { Mat4, Vec3, mat4, vec2, vec3 } from "wgpu-matrix";
 import {
   ShaderDataDefinitions,
   StructuredView,
@@ -7,8 +6,7 @@ import {
   makeStructuredView,
 } from "webgpu-utils";
 import { VPTransformationMatrixGroupBinding, VP_NAME } from "../shaders";
-import { Updatable, VirtualView } from "../scene/types";
-import Controller from "./controller";
+import { VirtualView } from "../scene/types";
 import { Ray } from "../maths/Ray";
 
 export interface Camera {
@@ -99,18 +97,18 @@ export class Camera implements VirtualView {
     return vec3.copy(_v);
   }
 
-  worldToViewportPoint(pos: Vec3) {
-    vec3.copy(pos, _v);
-    this.project(_v);
-    return vec2.create(_v[0], _v[1]);
-  }
-
   worldToScreenPoint(pos: Vec3) {
     const vp = this.worldToViewportPoint(pos);
     const [x, y] = this.viewportToScreenPoint(vp[0], vp[1]);
     vp[0] = x;
     vp[1] = y;
     return vp;
+  }
+
+  worldToViewportPoint(pos: Vec3) {
+    vec3.copy(pos, _v);
+    this.project(_v);
+    return vec2.create(_v[0], _v[1]);
   }
 
   project(pos: Vec3) {
@@ -148,6 +146,13 @@ export class Camera implements VirtualView {
 
     vec3.transformMat4(origin, _m, origin);
 
+    // 还是直接用相机原点吧，怕前面的近平面点算错
+    // const [vx, vy] = this.screenToViewportPoint(x, y);
+    // vec3.set(vx, vy, 1, _v); // 无穷远处
+    // this.unproject(_v);
+    // const origin = vec3.copy(this.cameraPosition);
+    // const direction = vec3.sub(_v, origin);
+    // vec3.normalize(direction, direction);
     return new Ray(origin, direction);
   }
 }
@@ -161,62 +166,5 @@ export class PerspectiveCamera extends Camera {
   ) {
     super();
     this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, near, far);
-  }
-}
-
-export class OrbitController implements Updatable {
-  arcballController: ArcballCamera;
-  id = "orbitcontroller-tips";
-  constructor(
-    public camera: Camera,
-    public canvas: HTMLCanvasElement,
-    public options?: { zoomSpeed?: number }
-  ) {
-    this.arcballController = this.createArcBallCamera(
-      camera.eye,
-      camera.target,
-      camera.up
-    );
-  }
-
-  createArcBallCamera(eye: Vec3, target: Vec3, up: Vec3) {
-    const width = this.canvas.clientWidth || parseInt(this.canvas.style.width);
-    const height =
-      this.canvas.clientHeight || parseInt(this.canvas.style.height);
-    const { zoomSpeed } = this.options ?? {};
-    const orbitController = new ArcballCamera(
-      eye,
-      target,
-      up,
-      zoomSpeed ?? 0.5,
-      [width, height]
-    );
-    const controller = new Controller();
-    controller.mousemove = (prev, cur, evt) => {
-      if (evt.buttons == 1) {
-        orbitController.rotate(prev, cur);
-      } else if (evt.buttons == 2) {
-        orbitController.pan([cur[0] - prev[0], prev[1] - cur[1]]);
-      }
-    };
-    controller.wheel = (amt) => {
-      orbitController.zoom(amt * 0.5);
-    };
-    controller.registerForCanvas(this.canvas);
-    if (!document.getElementById(this.id)) {
-      const div = document.createElement("div");
-      div.innerText =
-        "Controls: left-click to drag, right-click to pan, scroll to zoom.";
-      document.body.insertBefore(div, document.body.firstChild);
-      div.id = this.id;
-    }
-    return orbitController;
-  }
-
-  update() {
-    this.camera.viewMatrix = this.arcballController.camera;
-    this.camera.cameraPosition = vec3.getTranslation(
-      mat4.inverse(this.camera.viewMatrix)
-    );
   }
 }

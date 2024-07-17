@@ -21,14 +21,20 @@ export type MousePoint = [number, number];
 export interface BtnEvent extends UIEvent {
   buttons?: number;
 }
-export default class Controller {
-  public mousemove:
-    | ((prevMouse: MousePoint, curMouse: MousePoint, evt: BtnEvent) => void)
-    | null = null;
-  public press: ((curMouse: MousePoint, evt: BtnEvent) => void) | null = null;
-  public wheel: ((amount: number) => void) | null = null;
-  public twoFingerDrag: ((dragVector: Vec2) => void) | null = null;
-  public pinch: ((amount: number) => void) | null = null;
+export abstract class CanvasController {
+  abstract mousemove(
+    prevMouse: MousePoint,
+    curMouse: MousePoint,
+    evt: BtnEvent
+  ): void;
+  abstract wheel(amount: number): void;
+  press(curMouse: MousePoint, evt: BtnEvent) {}
+  twoFingerDrag(dragVector: Vec2) {}
+  pinch(amount: number) {}
+
+  constructor(canvas?: HTMLCanvasElement) {
+    canvas && this.registerForCanvas(canvas);
+  }
 
   registerForCanvas(canvas: HTMLCanvasElement) {
     let prevMouse: MousePoint;

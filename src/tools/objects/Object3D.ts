@@ -141,6 +141,7 @@ export abstract class Object3D<
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
     super.render(renderPass, device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
+    if (vertexCount <= 0) return;
     renderPass.setPipeline(this.renderPipeline);
     if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
     this.bindGroups.forEach((group, index) => {

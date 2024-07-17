@@ -15,7 +15,7 @@ import { ENV_NAME, EnvMapGroupBinding } from "../../shaders";
 import { Vec3, Vec4, mat4 } from "wgpu-matrix";
 import vertex from "../../shaders/vertex-wgsl/full-plane.wgsl";
 import fragment from "../../shaders/fragment-wgsl/skybox.wgsl";
-import { Camera } from "../../camera";
+import { Camera } from "../../cameras/Camera.ts";
 import { StaticTextureUtil } from "../StaticTextureUtil";
 import {
   BuildOptions,

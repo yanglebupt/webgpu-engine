@@ -1,4 +1,5 @@
-import { Camera, OrbitController } from "../camera";
+import { Camera } from "../cameras/Camera";
+import { CameraController } from "../cameras/CameraController";
 import { Component } from "../components/Component";
 import { EntityObject, callFunc } from "../entitys/EntityObject";
 import { Logger } from "../helper";
@@ -168,7 +169,7 @@ export class Scene implements Renderable {
         else this.children.push(obj as Renderable);
       }
       if (Type.isUpdatable(obj)) {
-        if (obj instanceof OrbitController) this.add(obj.camera);
+        if (obj instanceof CameraController) this.add(obj.camera);
         this.updates.push(obj as Updatable);
       }
     }

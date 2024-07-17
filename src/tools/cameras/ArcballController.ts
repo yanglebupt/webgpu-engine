@@ -1,14 +1,8 @@
-import {
-  Mat4,
-  Vec2,
-  Vec3,
-  mat3,
-  mat4,
-  quat,
-  vec2,
-  vec3,
-  vec4,
-} from "wgpu-matrix";
+import { Mat4, Vec2, mat3, mat4, quat, vec2, vec3, vec4 } from "wgpu-matrix";
+import { BtnEvent, MousePoint } from "./CanvasController";
+import { Camera } from "./Camera";
+import { CameraController } from "./CameraController";
+import { clamp } from "../math";
 
 /* The arcball camera will be placed at the position 'eye', rotating
  * around the point 'center', with the up vector 'up'. 'screenDims'
@@ -16,20 +10,30 @@ import {
  * so the mouse positions can be normalized into [-1, 1] from the pixel
  * coordinates.
  */
-export default class ArcballCamera {
+export class ArcballController extends CameraController {
   invScreen: [number, number];
   centerTranslation: Mat4;
   translation: Mat4;
   rotation;
-  camera: Mat4;
-  invCamera: Mat4;
+  viewMatrix: Mat4;
+  invViewMatrix: Mat4;
+  zoomSpeed: number;
+
+  id = "arcball-controller-tips";
+
   constructor(
-    public eye: Vec3,
-    public center: Vec3,
-    public up: Vec3,
-    public zoomSpeed: number,
-    public screenDims: [number, number]
+    camera: Camera,
+    canvas: HTMLCanvasElement,
+    zoomSpeed: number = 0.5
   ) {
+    super(camera, canvas);
+
+    const width = canvas.clientWidth || parseInt(canvas.style.width);
+    const height = canvas.clientHeight || parseInt(canvas.style.height);
+
+    const screenDims = [width, height];
+    const { eye, target: center, up } = camera;
+
     var veye = vec3.set(eye[0], eye[1], eye[2]);
     var vcenter = vec3.set(center[0], center[1], center[2]);
     var vup = vec3.set(up[0], up[1], up[2]);
@@ -72,9 +76,43 @@ export default class ArcballCamera {
     this.rotation = quat.fromMat(rotMat);
     quat.normalize(this.rotation, this.rotation);
 
-    this.camera = mat4.create();
-    this.invCamera = mat4.create();
+    this.viewMatrix = mat4.create();
+    this.invViewMatrix = mat4.create();
     this.updateCameraMatrix();
+  }
+
+  description() {
+    if (!document.getElementById(this.id)) {
+      const div = document.createElement("div");
+      div.innerText =
+        "Controls: left-click to drag, right-click to pan, scroll to zoom.";
+      document.body.insertBefore(div, document.body.firstChild);
+      div.id = this.id;
+    }
+  }
+
+  mousemove(prev: MousePoint, cur: MousePoint, evt: BtnEvent): void {
+    if (evt.buttons == 1) {
+      this.rotate(prev, cur);
+    } else if (evt.buttons == 2) {
+      this.pan([cur[0] - prev[0], prev[1] - cur[1]]);
+    }
+  }
+
+  wheel(amount: number): void {
+    this.zoom(amount * 0.5);
+  }
+
+  screenToArcball(p: Vec2) {
+    const dist = vec2.dot(p, p);
+    if (dist <= 1.0) {
+      return quat.set(p[0], p[1], Math.sqrt(1.0 - dist), 0);
+    } else {
+      const unitP = vec2.normalize(p);
+      // cgmath is w, x, y, z
+      // glmatrix is x, y, z, w
+      return quat.set(unitP[0], unitP[1], 0, 0);
+    }
   }
 
   rotate(prevMouse: Vec2, curMouse: Vec2) {
@@ -88,8 +126,8 @@ export default class ArcballCamera {
       clamp(1.0 - curMouse[1] * 2.0 * this.invScreen[1], -1.0, 1.0)
     );
 
-    var mPrevBall = screenToArcball(mPrev);
-    var mCurBall = screenToArcball(mCur);
+    var mPrevBall = this.screenToArcball(mPrev);
+    var mCurBall = this.screenToArcball(mCur);
     // rotation = curBall * prevBall * rotation
     this.rotation = quat.mul(this.rotation, mPrevBall, this.rotation);
     this.rotation = quat.mul(this.rotation, mCurBall, this.rotation);
@@ -114,7 +152,7 @@ export default class ArcballCamera {
       0,
       0
     );
-    var worldDelta = vec4.transformMat4(delta, this.invCamera);
+    var worldDelta = vec4.transformMat4(delta, this.invViewMatrix);
     var translation = mat4.translation(worldDelta);
     this.centerTranslation = mat4.mul(
       this.centerTranslation,
@@ -123,41 +161,16 @@ export default class ArcballCamera {
     );
     this.updateCameraMatrix();
   }
+
   updateCameraMatrix() {
     // camera = translation * rotation * centerTranslation
     var rotMat = mat4.fromQuat(this.rotation);
-    this.camera = mat4.mul(rotMat, this.centerTranslation, this.camera);
-    this.camera = mat4.mul(this.translation, this.camera, this.camera);
-    this.invCamera = mat4.invert(this.camera, this.invCamera);
+    this.viewMatrix = mat4.mul(rotMat, this.centerTranslation, this.viewMatrix);
+    this.viewMatrix = mat4.mul(
+      this.translation,
+      this.viewMatrix,
+      this.viewMatrix
+    );
+    this.invViewMatrix = mat4.invert(this.viewMatrix, this.invViewMatrix);
   }
-  eyePos() {
-    return [this.invCamera[12], this.invCamera[13], this.invCamera[14]];
-  }
-  eyeDir() {
-    var dir = vec4.set(0.0, 0.0, -1.0, 0.0);
-    dir = vec4.transformMat4(dir, dir, this.invCamera);
-    dir = vec4.normalize(dir, dir);
-    return [dir[0], dir[1], dir[2]];
-  }
-  upDir() {
-    var dir = vec4.set(0.0, 1.0, 0.0, 0.0);
-    dir = vec4.transformMat4(dir, dir, this.invCamera);
-    dir = vec4.normalize(dir, dir);
-    return [dir[0], dir[1], dir[2]];
-  }
-}
-
-export function screenToArcball(p: Vec2) {
-  const dist = vec2.dot(p, p);
-  if (dist <= 1.0) {
-    return quat.set(p[0], p[1], Math.sqrt(1.0 - dist), 0);
-  } else {
-    const unitP = vec2.normalize(p);
-    // cgmath is w, x, y, z
-    // glmatrix is x, y, z, w
-    return quat.set(unitP[0], unitP[1], 0, 0);
-  }
-}
-export function clamp(a: number, min: number, max: number) {
-  return a < min ? min : a > max ? max : a;
 }

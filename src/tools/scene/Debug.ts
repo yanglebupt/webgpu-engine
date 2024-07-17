@@ -21,12 +21,7 @@ export class Debug extends Group {
     });
   }
   constructor() {
-    super([
-      new Line(
-        new BufferGeometry({ vertices: [0, 0, 0, 0, 0, 0] }),
-        Debug.material
-      ),
-    ]);
+    super([new Line(new BufferGeometry({ vertices: [] }), Debug.material)]);
   }
 
   drawLines(...lines: DebugLine[]) {

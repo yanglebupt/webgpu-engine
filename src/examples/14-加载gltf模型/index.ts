@@ -1,6 +1,6 @@
 import { degToRad } from "../../tools/math";
 import { GLTFLoaderV2, GLTFScene } from "../../tools/loaders/GLTFLoader-v2";
-import { OrbitController, PerspectiveCamera } from "../../tools/camera";
+import { PerspectiveCamera } from "../../tools/cameras/Camera";
 import { GUI } from "dat.gui";
 import { Scene } from "../../tools/scene";
 import { DirectionLight, PointLight } from "../../tools/lights";
@@ -8,6 +8,7 @@ import { WebGPURenderer } from "../../tools/renderer";
 import { LoaderBarDomElement } from "./loaderBar";
 import { EnvMapLoader } from "../../tools/utils/envmap";
 import { Logger } from "../../tools/helper";
+import { ArcballController } from "../../tools/cameras/ArcballController";
 
 const base = location.href;
 Logger.production = false;
@@ -157,10 +158,12 @@ async function init() {
     config.far
   );
   camera.lookAt(config.eye, config.target);
-  const orbitController = new OrbitController(camera, renderer.canvas, {
-    zoomSpeed: config.zoomSpeed,
-  });
-  scene.add(orbitController);
+  const arcball = new ArcballController(
+    camera,
+    renderer.canvas,
+    config.zoomSpeed
+  );
+  scene.add(arcball);
 
   // 加载 gltf 模型 或者 obj 模型
   const loader = new GLTFLoaderV2();

@@ -1,5 +1,5 @@
 import { mat4 } from "wgpu-matrix";
-import { Camera } from "../camera";
+import { Camera } from "../cameras/Camera";
 import { Buildable, BuildOptions, RenderableFirst } from "../scene/types";
 import vertex from "./shaders/grid-controller/grid-controller-vert.wgsl";
 import fragment, {
