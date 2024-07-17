@@ -3,7 +3,7 @@ import { MeshMaterial } from "../materials/MeshMaterial";
 import { BuildOptions } from "../scene/types";
 import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
 import { GPUResource } from "../type";
-import { getBlendFromPreset } from "../utils/Blend";
+import { BlendingPreset, getBlendFromPreset } from "../utils/Blend";
 import { Object3D, WatchAction } from "./Object3D";
 
 /**

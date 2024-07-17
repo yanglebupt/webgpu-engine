@@ -9,6 +9,7 @@ import {
 import { VPTransformationMatrixGroupBinding, VP_NAME } from "../shaders";
 import { Updatable, VirtualView } from "../scene/types";
 import Controller from "./controller";
+import { Ray } from "../maths/Ray";
 
 export interface Camera {
   eye: Vec3;
@@ -17,7 +18,12 @@ export interface Camera {
   matrix: Mat4;
   viewMatrix: Mat4;
   cameraPosition: Vec3;
+  near: number;
+  far: number;
 }
+
+const _v = vec3.create();
+const _m = mat4.create();
 
 export class Camera implements VirtualView {
   static defs: ShaderDataDefinitions;
@@ -30,6 +36,9 @@ export class Camera implements VirtualView {
       Camera.view = makeStructuredView(Camera.defs.uniforms[VP_NAME]);
     } catch (error) {}
   }
+
+  // 渲染画布的宽高
+  renderResolution?: { width: number; height: number };
 
   constructor() {
     this.eye = [0, 0, 0];
@@ -55,43 +64,103 @@ export class Camera implements VirtualView {
     };
   }
 
-  // screen 是 viewport 视角下的坐标 [-1,1]
-  screenToWorldPoint(x: number, y: number, z = 1) {
-    const tmp = vec3.create(0, 0, z);
-    this.project(tmp);
+  screenToViewportPoint(x: number, y: number) {
+    if (!this.renderResolution)
+      throw new Error(
+        "can not get viewport point without resolution, you must add your camera to a scene"
+      );
+    const vx = 2 * (x / this.renderResolution.width) - 1;
+    const vy = 1 - 2 * (y / this.renderResolution.height);
+    return [vx, vy];
+  }
 
-    const res = vec3.create(x, y, tmp[2]);
-    this.unproject(res);
-    res[2] = z;
-    return res;
+  viewportToScreenPoint(vx: number, vy: number) {
+    if (!this.renderResolution)
+      throw new Error(
+        "can not transform without resolution, you must add your camera to a scene"
+      );
+    const x = 0.5 * (vx + 1) * this.renderResolution.width;
+    const y = 0.5 * (1 - vy) * this.renderResolution.height;
+    return [x, y];
+  }
+
+  screenToWorldPoint(x: number, y: number, z = 1) {
+    vec3.set(0, 0, z, _v);
+    this.project(_v);
+
+    const [vx, vy] = this.screenToViewportPoint(x, y);
+
+    _v[0] = vx;
+    _v[1] = vy;
+
+    this.unproject(_v);
+    _v[2] = z;
+
+    return vec3.copy(_v);
+  }
+
+  worldToViewportPoint(pos: Vec3) {
+    vec3.copy(pos, _v);
+    this.project(_v);
+    return vec2.create(_v[0], _v[1]);
   }
 
   worldToScreenPoint(pos: Vec3) {
-    this.project(pos);
-    return vec2.create(pos[0], pos[1]);
+    const vp = this.worldToViewportPoint(pos);
+    const [x, y] = this.viewportToScreenPoint(vp[0], vp[1]);
+    vp[0] = x;
+    vp[1] = y;
+    return vp;
   }
 
   project(pos: Vec3) {
-    const m = mat4.multiply(this.matrix, this.viewMatrix);
-    vec3.transformMat4(pos, m, pos);
+    mat4.multiply(this.matrix, this.viewMatrix, _m);
+    vec3.transformMat4(pos, _m, pos);
   }
 
   unproject(pos: Vec3) {
-    const m = mat4.multiply(this.matrix, this.viewMatrix);
-    mat4.inverse(m, m);
-    vec3.transformMat4(pos, m, pos);
+    mat4.multiply(this.matrix, this.viewMatrix, _m);
+    mat4.inverse(_m, _m);
+    vec3.transformMat4(pos, _m, pos);
+  }
+
+  // 从相机中心发射一条指向屏幕位置的射线
+  screenPointToRay(x: number, y: number) {
+    // 注意想要可视化，origin 不能是相机位置，必须要让 origin 移动到近平面上，防止被裁剪掉，从而无法绘制线段
+    const [vx, vy] = this.screenToViewportPoint(x, y);
+    vec3.set(vx, vy, 1, _v); // 无穷远处
+    // --> 相机坐标系下就是相机坐标系下的 dir
+    mat4.inverse(this.matrix, _m);
+    vec3.transformMat4(_v, _m, _v);
+    vec3.normalize(_v, _v);
+
+    // _v[3] = 0; // 代表是方向，而不是点，后面变换到世界坐标，不受平移的影响
+
+    // 计算射线和近平面的交点
+    const near = this.near;
+    const t = -near / _v[2]; // 相机是看向 -Z 的
+    const origin = vec3.mulScalar(_v, t);
+
+    mat4.inverse(this.viewMatrix, _m);
+
+    vec3.transformMat3(_v, _m, _v); // 注意是 Mat3
+    const direction = vec3.normalize(_v);
+
+    vec3.transformMat4(origin, _m, origin);
+
+    return new Ray(origin, direction);
   }
 }
 
 export class PerspectiveCamera extends Camera {
   constructor(
-    fieldOfViewYInRadians: number,
-    aspect: number,
-    zNear: number,
-    zFar: number
+    public fieldOfViewYInRadians: number,
+    public aspect: number,
+    public near: number,
+    public far: number
   ) {
     super();
-    this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, zNear, zFar);
+    this.matrix = mat4.perspective(fieldOfViewYInRadians, aspect, near, far);
   }
 }
 

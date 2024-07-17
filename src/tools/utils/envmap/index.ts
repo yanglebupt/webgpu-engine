@@ -22,6 +22,7 @@ import {
   Buildable,
   Computable,
   Renderable,
+  RenderableFirst,
   VirtualView,
 } from "../../scene/types";
 import { GPUSamplerCache } from "../../scene/cache";
@@ -104,17 +105,7 @@ export function createSamplerByPolyfill(
 }
 
 export abstract class EnvMap
-  implements
-    Buildable,
-    Computable,
-    Renderable<
-      (
-        renderPass: GPURenderPassEncoder,
-        device: GPUDevice,
-        camera: Camera
-      ) => void
-    >,
-    VirtualView
+  implements Buildable, Computable, RenderableFirst, VirtualView
 {
   static features: GPUFeatureName[] = ["float32-filterable"];
   static defs: ShaderDataDefinitions;
@@ -137,13 +128,7 @@ export abstract class EnvMap
     device?: GPUDevice
   ): void;
 
-  build({
-    device,
-    format,
-    depthFormat = StaticTextureUtil.depthFormat,
-    cached,
-    antialias,
-  }: BuildOptions) {
+  build({ device, format, depthFormat, cached, antialias }: BuildOptions) {
     const { color, width, height } = this.hdrReturn;
     const { mipmaps } = this.options ?? {};
 

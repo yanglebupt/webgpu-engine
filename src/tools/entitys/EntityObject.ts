@@ -15,6 +15,11 @@ export function callFunc(
 }
 
 let _objectId = 0;
+
+type EntityObjectConstructorType = new (
+  ...argumentsList: any[]
+) => EntityObject;
+
 export abstract class EntityObject
   implements
     Buildable,
@@ -79,11 +84,26 @@ export abstract class EntityObject
     this.children.push(child);
   }
 
-  getChildren(idx: number) {
+  getChildrenByIndex(idx: number) {
     return this.children[idx];
+  }
+
+  getChildrenByType<C extends EntityObjectConstructorType>(construct: C) {
+    return this.children.filter(
+      (child) => child.constructor.name == construct.name
+    ) as InstanceType<C>[];
+  }
+
+  getFirstChildByType<C extends EntityObjectConstructorType>(construct: C) {
+    return this.getChildrenByType(construct)[0] as InstanceType<C>;
   }
 
   removeChildren() {}
 
   clearChildren() {}
+
+  // TODO
+  destroy() {
+    this.children.forEach((child) => child.destroy());
+  }
 }

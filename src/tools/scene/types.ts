@@ -1,4 +1,5 @@
 import { Scene } from ".";
+import { Camera } from "../camera";
 import { MipMap } from "../utils/mipmaps";
 import {
   GPUBindGroupLayoutCache,
@@ -6,6 +7,8 @@ import {
   GPUSamplerCache,
   SolidColorTextureCache,
 } from "./cache";
+
+export const REDNDER_FIRST = Symbol("REDNDER_FIRST");
 
 export class Type {
   static getClassName(obj: Object) {
@@ -87,6 +90,15 @@ export interface Renderable<
 > {
   render: RenderFunc;
 }
+
+export interface RenderableFirst
+  extends Renderable<
+    (
+      renderPass: GPURenderPassEncoder,
+      device: GPUDevice,
+      camera: Camera
+    ) => void
+  > {}
 
 /*
   需要执行计算的对象，一般是进行额外的任务 compute shader

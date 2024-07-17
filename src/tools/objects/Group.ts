@@ -5,7 +5,7 @@ export class Group extends EntityObject {
 
   updateBuffers(device: GPUDevice) {}
 
-  constructor(public children: EntityObject[]) {
+  constructor(public children: EntityObject[] = []) {
     super();
     this.children.forEach((child) => (child.parent = this.transform));
   }

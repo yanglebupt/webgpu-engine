@@ -10,6 +10,7 @@ import {
   createSamplerByPolyfill,
   getFilterType,
 } from "../utils/envmap";
+import { Debug } from "./Debug";
 
 import {
   BuildOptions,
@@ -18,6 +19,8 @@ import {
   Renderable,
   Type,
   Updatable,
+  REDNDER_FIRST,
+  RenderableFirst,
 } from "./types";
 
 export interface SceneOption {
@@ -25,6 +28,7 @@ export interface SceneOption {
   envMap?: EnvMap;
   showEnvMap?: boolean;
   development?: boolean;
+  debug?: boolean;
 }
 
 export class Scene implements Renderable {
@@ -45,9 +49,16 @@ export class Scene implements Renderable {
   public maxLight: number = 50;
   public lightCount: number = 0;
   public clock: Clock = new Clock();
+  public debugInstance?: Debug;
+  public renderFirst: RenderableFirst[] = [];
 
   constructor(public renderer: WebGPURenderer, options?: SceneOption) {
-    this.options = { showEnvMap: true, development: true, ...options };
+    this.options = {
+      showEnvMap: true,
+      development: false,
+      debug: false,
+      ...options,
+    };
     this.device = renderer.device;
     this.buildOptions = {
       device: this.device,
@@ -121,6 +132,11 @@ export class Scene implements Renderable {
     });
 
     this.makeBindGroup();
+
+    if (this.options.debug) {
+      this.debugInstance = new Debug();
+      this.debugInstance?.build(this.buildOptions);
+    }
   }
 
   add(obj: Addable) {
@@ -131,6 +147,10 @@ export class Scene implements Renderable {
     if (obj instanceof Camera) {
       this.cameras.push(obj);
       this.mainCamera = obj;
+      obj.renderResolution = {
+        width: this.renderer.width,
+        height: this.renderer.height,
+      };
     } else if (obj instanceof Light) {
       this.lights.push(obj);
       this.lightCount++;
@@ -143,7 +163,9 @@ export class Scene implements Renderable {
       }
     } else {
       if (Type.isRenderable(obj)) {
-        this.children.push(obj as Renderable);
+        if (Reflect.get(obj, REDNDER_FIRST))
+          this.renderFirst.push(obj as RenderableFirst);
+        else this.children.push(obj as Renderable);
       }
       if (Type.isUpdatable(obj)) {
         if (obj instanceof OrbitController) this.add(obj.camera);
@@ -208,9 +230,7 @@ export class Scene implements Renderable {
   }
 
   set hasEnvMap(hasEnvMap: boolean) {
-    if (hasEnvMap == this.options.showEnvMap) {
-      return;
-    }
+    if (hasEnvMap == this.options.showEnvMap) return;
     this.options.showEnvMap = hasEnvMap;
     this.buffers[2] = hasEnvMap
       ? this.options.envMap!.diffuseTexure.createView()
@@ -219,6 +239,14 @@ export class Scene implements Renderable {
       ? this.options.envMap!.specularTexure.createView()
       : this.buildOptions.cached.solidColorTexture.default.createView();
     this.makeBindGroup();
+  }
+
+  set debug(debug: boolean) {
+    if (debug === this.options.debug) return;
+    this.options.debug = debug;
+    this.debugInstance?.destroy();
+    this.debugInstance = debug ? new Debug() : undefined;
+    this.debugInstance?.build(this.buildOptions);
   }
 
   renderChild(
@@ -263,6 +291,13 @@ export class Scene implements Renderable {
       this.children.forEach((child) => {
         this.renderChild(renderPass, child, dt, t);
       });
+
+      if (this.debugInstance)
+        this.renderChild(renderPass, this.debugInstance, dt, t);
+
+      for (const child of this.renderFirst) {
+        child.render(renderPass, this.device, this.mainCamera);
+      }
     }
   }
 }

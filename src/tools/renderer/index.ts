@@ -62,6 +62,7 @@ export class WebGPURenderer {
       backgroundColor: GPUColor;
       alphaMode: GPUCanvasAlphaMode;
       canvasConfig: CreateCanvasParameters;
+      development?: boolean;
     }>
   ) {
     this.canvasConfig = {
@@ -71,7 +72,7 @@ export class WebGPURenderer {
     Object.assign(this.canvasConfig, options?.canvasConfig);
     if (options) Reflect.deleteProperty(options, "canvasConfig");
     Object.assign(this, {
-      backgroundColor: [0, 0, 0, 1],
+      backgroundColor: [0, 0, 0, 0],
       ...options,
     });
   }
@@ -203,7 +204,7 @@ export class WebGPURenderer {
 
   render(scene: Scene) {
     const encoder = this.device.createCommandEncoder({
-      label: "render command encoder",
+      label: "render scene encoder",
     });
     this.renderScene(scene, encoder);
     this.device.queue.submit([encoder.finish()]);
