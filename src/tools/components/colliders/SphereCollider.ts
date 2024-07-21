@@ -7,22 +7,22 @@ import { Mesh } from "../../objects/Mesh";
 import { Scene } from "../../scene";
 import { Collider } from "./Collider";
 
-export class SphereCollider extends Collider {
-  sphere: Sphere;
+export class SphereCollider extends Collider<Sphere> {
+  collisionPrimitive: Sphere;
 
   constructor(public object: EntityObject) {
     super(object);
-    this.sphere = new Sphere();
     const { positions } = Reflect.get(object, "geometry") as Geometry;
-    this.sphere.setFromBufferAttribute(positions);
-    this.sphere.keepInit();
+    this.collisionPrimitive = new Sphere();
+    this.collisionPrimitive.setFromBufferAttribute(positions);
+    this.collisionPrimitive.keepInit();
   }
 
   updateVisible() {
     if (!this.visibleObject) return;
-    const r = this.sphere.radius;
+    const r = this.collisionPrimitive.radius;
     this.visibleObject.transform.scale = vec3.create(r, r, r);
-    this.visibleObject.transform.position = this.sphere.center;
+    this.visibleObject.transform.position = this.collisionPrimitive.center;
   }
 
   protected helper(scene: Scene) {
@@ -32,8 +32,7 @@ export class SphereCollider extends Collider {
   }
 
   protected update() {
-    const tf = this.transform.worldMatrix;
-    this.sphere.applyMatrix4(tf);
+    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
     super.update();
   }
 }

@@ -14,6 +14,17 @@ export class Plane extends PlaneData {
   }
 
   distanceToPoint(point: Vec3) {
+    // 点在 normal 同侧，距离为正，否则距离为负
     return vec3.dot(this.normal, point) + this.constant;
+  }
+
+  copy(plane: Plane) {
+    vec3.copy(plane.normal, this.normal);
+    this.constant = plane.constant;
+    return this;
+  }
+
+  makeCopy() {
+    return new Plane().copy(this);
   }
 }

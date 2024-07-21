@@ -84,7 +84,10 @@ model.material = new MeshPhysicalMaterial({
 //   "/bunny/with-mtl/standalone/untitled.obj"
 // );
 console.log(model);
-const mesh = new Mesh(new CubeGeometry(), new MeshBasicMaterial());
+const mesh = new Mesh(
+  new CubeGeometry({ width: 1, height: 1, depth: 1 }),
+  new MeshBasicMaterial()
+);
 const cpn_1 = mesh.addComponent(RotateScript);
 const cpn_2 = model.addComponent(RotateScript);
 scene.add(mesh);
@@ -117,8 +120,8 @@ const pass = new RenderPass(fragment, [
 
 composer.addPass(pass);
 
-const pass_2 = new GlitchPass();
-composer.addPass(pass_2);
+// const pass_2 = new GlitchPass();
+// composer.addPass(pass_2);
 
 const settings = {
   color: [255, 0, 0, 255],

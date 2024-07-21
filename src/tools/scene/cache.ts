@@ -107,10 +107,7 @@ export class SolidColorTextureCache extends ObjectStringKeyCache<
     const texture = this.device.createTexture({
       size: [1, 1],
       format: format,
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     this.device.queue.writeTexture(
       { texture: texture },

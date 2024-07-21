@@ -6,7 +6,7 @@ import { MeshBasicMaterial } from "../../materials/MeshBasicMaterial";
 import { Scene } from "../../scene";
 
 // 所有的 Collider 可以共用一个 material
-export abstract class Collider extends EntityObjectComponent {
+export abstract class Collider<T> extends EntityObjectComponent {
   static material: MeshBasicMaterial;
   static {
     Collider.material = new MeshBasicMaterial({
@@ -17,6 +17,7 @@ export abstract class Collider extends EntityObjectComponent {
   visible = false;
   // color: Vec4 = [1, 1, 0, 1];
   protected visibleObject: Object3D | null = null;
+  abstract collisionPrimitive: T;
 
   constructor(public object: EntityObject) {
     super(object);

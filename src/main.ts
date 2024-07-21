@@ -19,7 +19,8 @@
 // import { frame } from "./examples/18-自己的几何形状/";
 // import { frame } from "./examples/19-重构 GLTFLoader";
 // import { frame } from "./examples/20-响应式属性变化";
-import { frame } from "./examples/21-事件监听";
+// import { frame } from "./examples/21-事件监听射线碰撞检测";
+import { frame } from "./examples/22-骨骼动画";
 // import { frame } from "./examples/测试/mipmap 生成方法的性能对比/spd";
 // import { frame } from "./examples/测试/mipmap 生成方法的性能对比/spd-2";
 // import { frame } from "./examples/测试/mipmap 生成方法的性能对比/rpl";

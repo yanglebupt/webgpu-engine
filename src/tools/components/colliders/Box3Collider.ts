@@ -7,26 +7,26 @@ import { Box3 } from "../../maths/Box3";
 import { Collider } from "./Collider";
 
 // AABB 轴对齐包围盒
-export class Box3Collider extends Collider {
-  box: Box3;
+export class Box3Collider extends Collider<Box3> {
+  collisionPrimitive: Box3;
 
   constructor(public object: EntityObject) {
     super(object);
-    this.box = new Box3();
     const { positions } = Reflect.get(object, "geometry") as Geometry;
-    this.box.setFromBufferAttribute(positions);
-    this.box.keepInit();
+    this.collisionPrimitive = new Box3();
+    this.collisionPrimitive.setFromBufferAttribute(positions);
+    this.collisionPrimitive.keepInit();
   }
 
   updateVisible() {
     if (!this.visibleObject) return;
     // 由于是轴对齐，因此只需要设置 position 和 scale，注意不需要重新计算顶点
-    this.box.getCenter(this.visibleObject.transform.position);
-    this.box.getHalfSize(this.visibleObject.transform.scale);
+    this.collisionPrimitive.getCenter(this.visibleObject.transform.position);
+    this.collisionPrimitive.getHalfSize(this.visibleObject.transform.scale);
   }
 
   protected helper(scene: Scene) {
-    if (!this.visible || this.box.isEmpty()) return;
+    if (!this.visible || this.collisionPrimitive.isEmpty()) return;
 
     this.visibleObject = new Line(
       new BufferGeometry({
@@ -42,8 +42,7 @@ export class Box3Collider extends Collider {
   }
 
   protected update() {
-    const tf = this.transform.worldMatrix;
-    this.box.applyMatrix4(tf);
+    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
     super.update();
   }
 }

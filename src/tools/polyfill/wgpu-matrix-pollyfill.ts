@@ -1,4 +1,4 @@
-import { Mat4, Quat, Vec3, mat3, mat4, quat } from "wgpu-matrix";
+import { Mat4, Quat, Vec3, mat3, mat4, quat, vec3 } from "wgpu-matrix";
 
 const _m1 = mat3.create();
 
@@ -96,4 +96,13 @@ mat4.decompose = (m: Mat4, q: Quat, v: Vec3, s: Vec3) => {
   s[0] = sx;
   s[1] = sy;
   s[2] = sz;
+};
+
+vec3.clampScalar = vec3.clamp;
+vec3.clampEwise = (v: Vec3, min: Vec3, max: Vec3, dst?: Vec3) => {
+  const newDst = dst ?? vec3.create();
+  newDst[0] = Math.min(max[0], Math.max(min[0], v[0]));
+  newDst[1] = Math.min(max[1], Math.max(min[1], v[1]));
+  newDst[2] = Math.min(max[2], Math.max(min[2], v[2]));
+  return newDst;
 };

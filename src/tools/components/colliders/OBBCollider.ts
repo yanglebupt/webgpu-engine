@@ -10,23 +10,25 @@ import { Collider } from "./Collider";
 const _box3 = new Box3();
 
 // OBB 包围盒
-export class OBBCollider extends Collider {
-  obb: OBB;
+export class OBBCollider extends Collider<OBB> {
+  collisionPrimitive: OBB;
 
   constructor(public object: EntityObject) {
     super(object);
-    this.obb = new OBB();
     const { positions } = Reflect.get(object, "geometry") as Geometry;
+    this.collisionPrimitive = new OBB();
     _box3.setFromBufferAttribute(positions);
-    this.obb.fromBox3(_box3);
-    this.obb.keepInit();
+    this.collisionPrimitive.fromBox3(_box3);
+    this.collisionPrimitive.keepInit();
   }
 
   updateVisible() {
     if (!this.visibleObject) return;
-    this.visibleObject.transform.scale = this.obb.halfSize;
-    this.visibleObject.transform.setRotationFromMatrix(this.obb.rotation);
-    this.visibleObject.transform.position = this.obb.center;
+    this.visibleObject.transform.scale = this.collisionPrimitive.halfSize;
+    this.visibleObject.transform.setRotationFromMatrix(
+      this.collisionPrimitive.rotation
+    );
+    this.visibleObject.transform.position = this.collisionPrimitive.center;
   }
 
   // same as Box3Collider
@@ -46,8 +48,7 @@ export class OBBCollider extends Collider {
   }
 
   protected update() {
-    const tf = this.transform.worldMatrix;
-    this.obb.applyMatrix4(tf);
+    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
     super.update();
   }
 }

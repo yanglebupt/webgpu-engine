@@ -14,7 +14,8 @@ Resources {
 Entry {
   let pixel = id.wh;
   var col = textureLoad(inputTexture, pixel, 0u);
-  let col2 = textureLoad(tex, pixel, 0u);
-  col*=col2;
+  let col2 = textureLoad(tex, pixel, 0u);  // 这里的 pixel 和 tex 的 pixel 不一定匹配
+  col *= col2;
+  // col += col2;
   textureStore(outputTexture, pixel, vec4f(pow(col.rgb, vec3f(uni.li)), col.a));
 }

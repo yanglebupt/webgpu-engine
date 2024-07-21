@@ -97,4 +97,14 @@ export class Sphere extends SphereData {
     vec3.getScaling(matrix, _v);
     this.radius = ori.radius * Math.max(..._v);
   }
+
+  copy(sphere: Sphere) {
+    vec3.copy(sphere.center, this.center);
+    this.radius = sphere.radius;
+    return this;
+  }
+
+  makeCopy() {
+    return new Sphere().copy(this);
+  }
 }

@@ -63,6 +63,12 @@ export class Box3 extends Box3Data {
     vec3.mulScalar(vector, 0.5, vector);
   }
 
+  setFromCenterAndSize(center: Vec3, size: Vec3) {
+    vec3.mulScalar(size, 0.5, _vector);
+    vec3.sub(center, _vector, this.min);
+    vec3.add(center, _vector, this.max);
+  }
+
   setFromBufferAttribute(positions: BufferAttribute<Float32Array>) {
     this.makeEmpty();
 
@@ -174,5 +180,20 @@ export class Box3 extends Box3Data {
       如果想要精确的 box，必须对每个顶点做变换，然后重新计算 min 和 max，显然对于顶点数很多模型，不能这么做
       但是我们可以在第一次计算 box 的时候，计算出顶点的 凸集（ConvexHull）（最外围的点集），后面只需要对 凸集 中的点进行变换即可
     */
+  }
+
+  copy(box: Box3) {
+    vec3.copy(box.min, this.min);
+    vec3.copy(box.max, this.max);
+    return this;
+  }
+
+  makeCopy() {
+    return new Box3().copy(this);
+  }
+
+  clampPoint(point: Vec3, target: Vec3) {
+    // find the closest to point, then write to target
+    vec3.clampEwise(point, this.min, this.max, target);
   }
 }

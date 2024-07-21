@@ -152,7 +152,8 @@ export class MeshPhysicalMaterial extends MeshMaterial {
     });
     const texturesView = this.textures.map(({ a, d, f }) => {
       if (a) {
-        a.upload(device, { sampler: cached.sampler, mipmap: cached.mipmap }, f);
+        a.format = f;
+        a.upload(device, { sampler: cached.sampler, mipmap: cached.mipmap });
         return a.texture.createView();
       } else {
         return cached.solidColorTexture

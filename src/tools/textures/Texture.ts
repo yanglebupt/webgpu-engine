@@ -4,7 +4,7 @@ import {
   getSizeFromSource,
   numMipLevels,
 } from "webgpu-utils";
-import { MipMap, maxMipLevelCount } from "../utils/mipmaps";
+import { MipMap } from "../utils/mipmaps";
 import { GPUSamplerCache } from "../scene/cache";
 import { StaticTextureUtil } from "../utils/StaticTextureUtil";
 
@@ -41,10 +41,8 @@ export class Texture {
 
   upload(
     device: GPUDevice,
-    cached: { sampler: GPUSamplerCache; mipmap: MipMap },
-    format?: GPUTextureFormat
+    cached: { sampler: GPUSamplerCache; mipmap: MipMap }
   ) {
-    if (format) this.format = format;
     const { sampler, mipmap } = cached;
     const size = getSizeFromSource(this.source, {});
     this.sampler = this.samplerDescriptor

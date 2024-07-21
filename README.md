@@ -13,6 +13,10 @@ https://www.willusher.io/archive
 
 https://toji.dev/webgpu-gltf-case-study/
 
+# 骨骼动画 
+
+https://www.orillusion.com/guide/animation/skeleton.html
+
 # WGSL语言介绍
 
 - <a href="https://zhuanlan.zhihu.com/p/645215443">WGSL语言介绍</a>
@@ -143,9 +147,8 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 # 后续进度
 
 - 完善 gltf 中的骨骼动画
-- 包围盒
-- 碰撞检测
-- 射线
+- 场景加速，以及利用 Cache 构建 render-order 减少整个场景的 setPipeline 等等
+- CPUBufferPool
 
 # 引用
 
