@@ -54,7 +54,10 @@ scene.add(amb_light);
 scene.add(new GridController());
 
 // //////////////// 各种 Collider 可视化 ////////////////
-// const mesh = new Mesh(new TorusGeometry(), new MeshBasicMaterial());
+// const mesh = new Mesh(
+//   new TorusGeometry(),
+//   new MeshBasicMaterial({ wireframe: false })
+// );
 // mesh.addComponent(RotateScript, { stop: false });
 // mesh.addComponent(Box3Collider, { visible: true });
 // mesh.addComponent(OBBCollider, { visible: true });

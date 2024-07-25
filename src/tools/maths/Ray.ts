@@ -6,7 +6,9 @@ export class Ray {
   constructor(
     public origin: Vec3 = vec3.create(),
     public direction: Vec3 = vec3.create(0, 0, 1)
-  ) {}
+  ) {
+    this.direction = vec3.normalize(this.direction, this.direction);
+  }
 
   // 从原点出发，经过某个点
   passPoint(end: Vec3) {

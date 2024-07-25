@@ -46,9 +46,4 @@ export class OBBCollider extends Collider<OBB> {
     );
     scene.add(this.visibleObject);
   }
-
-  protected update() {
-    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
-    super.update();
-  }
 }

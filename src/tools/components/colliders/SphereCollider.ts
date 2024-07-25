@@ -30,9 +30,4 @@ export class SphereCollider extends Collider<Sphere> {
     this.visibleObject = new Mesh(new SphereGeometry(), Collider.material);
     scene.add(this.visibleObject);
   }
-
-  protected update() {
-    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
-    super.update();
-  }
 }

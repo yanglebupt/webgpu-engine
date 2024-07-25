@@ -51,6 +51,7 @@ export class Camera implements VirtualView {
     if (target) this.target = target;
     if (up) this.up = up;
     this.viewMatrix = mat4.lookAt(this.eye, this.target, this.up);
+    // zero = viewMatrix * cameraPosition (世界坐标变成相机坐标)，因此 cameraPosition = (viewMatrix)^-1 * zero
     this.cameraPosition = vec3.getTranslation(mat4.inverse(this.viewMatrix));
   }
 

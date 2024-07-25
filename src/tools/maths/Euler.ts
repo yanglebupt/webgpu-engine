@@ -1,36 +1,39 @@
 import { Mat4, Vec3, vec3 } from "wgpu-matrix";
 import { RotationOrder } from "wgpu-matrix/dist/2.x/quat-impl";
 import { clamp } from "../math";
+import { Axis } from "./Axis";
 
 export class Euler {
   elements: Vec3;
+
   constructor(x = 0, y = 0, z = 0, public order: RotationOrder = "xyz") {
     this.elements = vec3.create(x, y, z);
   }
 
-  get x() {
+  // proxy for elements make sure can call onChange
+  get [Axis.X]() {
     return this.elements[0];
   }
 
-  set x(v: number) {
+  set [Axis.X](v: number) {
     this.elements[0] = v;
     this.onChange();
   }
 
-  get y() {
+  get [Axis.Y]() {
     return this.elements[1];
   }
 
-  set y(v: number) {
+  set [Axis.Y](v: number) {
     this.elements[1] = v;
     this.onChange();
   }
 
-  get z() {
+  get [Axis.Z]() {
     return this.elements[2];
   }
 
-  set z(v: number) {
+  set [Axis.Z](v: number) {
     this.elements[2] = v;
     this.onChange();
   }

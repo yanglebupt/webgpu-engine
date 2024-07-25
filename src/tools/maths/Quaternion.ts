@@ -1,52 +1,55 @@
 import { Quat, quat } from "wgpu-matrix";
 import { Euler } from "./Euler";
+import { Axis } from "./Axis";
 
 export class Quaternion {
   elements: Quat;
+
   constructor(x = 0, y = 0, z = 0, w = 1) {
     this.elements = quat.create(x, y, z, w);
   }
-  get x() {
+
+  get [Axis.X]() {
     return this.elements[0];
   }
 
-  set x(v: number) {
+  set [Axis.X](v: number) {
     this.elements[0] = v;
     this.onChange();
   }
 
-  get y() {
+  get [Axis.Y]() {
     return this.elements[1];
   }
 
-  set y(v: number) {
+  set [Axis.Y](v: number) {
     this.elements[1] = v;
     this.onChange();
   }
 
-  get z() {
+  get [Axis.Z]() {
     return this.elements[2];
   }
 
-  set z(v: number) {
+  set [Axis.Z](v: number) {
     this.elements[2] = v;
     this.onChange();
   }
 
-  get w() {
+  get [Axis.W]() {
     return this.elements[3];
   }
 
-  set w(v: number) {
+  set [Axis.W](v: number) {
     this.elements[3] = v;
     this.onChange();
   }
 
   setFromEuler(rotation: Euler, update = true) {
     quat.fromEuler(
-      rotation.x,
-      rotation.y,
-      rotation.z,
+      rotation[0],
+      rotation[1],
+      rotation[2],
       rotation.order,
       this.elements
     );

@@ -1,4 +1,6 @@
+import { mat4 } from "wgpu-matrix";
 import { getBindGroupEntries } from "..";
+import { Transform } from "../components/Transform";
 import { EntityObject } from "../entitys/EntityObject";
 import { Geometry } from "../geometrys/Geometry";
 import { Material, ShaderBuildResult } from "../materials/Material";
@@ -36,6 +38,11 @@ export abstract class Object3D<
   protected buildOptions!: BuildOptions;
   protected renderPipeline!: GPURenderPipeline;
 
+  protected componentBuildResult!: {
+    transformUniformValue: Float32Array;
+    vertexResources: GPUResource[];
+  };
+
   protected materialBuildResult!: {
     vertex?: ShaderBuildResult;
     fragment: ShaderBuildResult;
@@ -56,11 +63,6 @@ export abstract class Object3D<
     } | null;
   };
 
-  protected componentBuildResult!: {
-    transformUniformValue: Float32Array;
-    vertexResources: GPUResource[];
-  };
-
   protected vertexResources!: {
     bindGroups: GPUBindGroup[];
     bindGroupLayouts: GPUBindGroupLayout[];
@@ -73,8 +75,8 @@ export abstract class Object3D<
     code: GPUShaderModuleCacheKey<any>;
   };
 
-  constructor(geometry: G, material: M) {
-    super();
+  constructor(geometry: G, material: M, instanceCount = 1) {
+    super(instanceCount);
     this.geometry = geometry;
     this._material = this.observeMaterial(material);
   }
@@ -83,6 +85,7 @@ export abstract class Object3D<
     return super.static;
   }
 
+  // 防止 static 情况下 writeBuffer
   set static(__static: boolean) {
     const preStatic = super.static;
     if (__static == super.static) return;
@@ -139,7 +142,7 @@ export abstract class Object3D<
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
-    super.render(renderPass, device);
+    if (!this.static) this.updateBuffers(device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     if (vertexCount <= 0) return;
     renderPass.setPipeline(this.renderPipeline);
@@ -149,9 +152,9 @@ export abstract class Object3D<
     });
     if (indices) {
       renderPass.setIndexBuffer(indices.buffer, indices.format);
-      renderPass.drawIndexed(indices.indexCount);
+      renderPass.drawIndexed(indices.indexCount, this.instanceCount);
     } else {
-      renderPass.draw(vertexCount);
+      renderPass.draw(vertexCount, this.instanceCount);
     }
   }
 
@@ -159,9 +162,40 @@ export abstract class Object3D<
     const { transformUniformValue, vertexResources } =
       this.componentBuildResult;
     const transformUniform = vertexResources[0] as GPUBuffer;
-    transformUniformValue.set(this.transform.worldMatrix, 0);
-    transformUniformValue.set(this.transform.worldNormalMatrix, 16);
+    const { instanceCount, instancesTransform, transform } = this;
+    if (instanceCount > 1 && instancesTransform.length > 1) {
+      const rootWorldMatrix = transform.worldMatrix;
+      for (let i = 0, n = instancesTransform.length; i < n; i++) {
+        const transform = instancesTransform[i];
+        const offset = 32 * i;
+        transformUniformValue.set(
+          mat4.multiply(rootWorldMatrix, transform.worldMatrix),
+          offset + 0
+        );
+        transformUniformValue.set(transform.worldNormalMatrix, offset + 16);
+      }
+    } else {
+      transformUniformValue.set(transform.worldMatrix, 0);
+      transformUniformValue.set(transform.worldNormalMatrix, 16);
+    }
     device.queue.writeBuffer(transformUniform, 0, transformUniformValue);
+  }
+
+  buildComponent(device: GPUDevice) {
+    const transformUniform = device.createBuffer({
+      size: Float32Array.BYTES_PER_ELEMENT * 4 * 4 * 2 * this.instanceCount,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    });
+    const transformUniformValue = new Float32Array(
+      transformUniform.size / Float32Array.BYTES_PER_ELEMENT
+    );
+
+    this.componentBuildResult = {
+      transformUniformValue,
+      vertexResources: [transformUniform],
+    };
+
+    this.updateBuffers(device);
   }
 
   buildGeometry(device: GPUDevice) {
@@ -259,23 +293,6 @@ export abstract class Object3D<
       ],
       resources: [],
     };
-  }
-
-  buildComponent(device: GPUDevice) {
-    const transformUniform = device.createBuffer({
-      size: Float32Array.BYTES_PER_ELEMENT * 4 * 4 * 2,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-    });
-    const transformUniformValue = new Float32Array(
-      transformUniform.size / Float32Array.BYTES_PER_ELEMENT
-    );
-
-    this.componentBuildResult = {
-      transformUniformValue,
-      vertexResources: [transformUniform],
-    };
-
-    this.updateBuffers(device);
   }
 
   buildMaterial(options: BuildOptions) {

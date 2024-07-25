@@ -40,9 +40,4 @@ export class Box3Collider extends Collider<Box3> {
     );
     scene.add(this.visibleObject);
   }
-
-  protected update() {
-    this.collisionPrimitive.applyMatrix4(this.transform.worldMatrix);
-    super.update();
-  }
 }

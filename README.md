@@ -15,6 +15,8 @@ https://toji.dev/webgpu-gltf-case-study/
 
 # 骨骼动画 
 
+https://webgl2fundamentals.org/webgl/lessons/webgl-skinning.html
+
 https://www.orillusion.com/guide/animation/skeleton.html
 
 # WGSL语言介绍
@@ -146,6 +148,7 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 
 # 后续进度
 
+- 权量是否修改 ECS 系统
 - 完善 gltf 中的骨骼动画
 - 场景加速，以及利用 Cache 构建 render-order 减少整个场景的 setPipeline 等等
 - CPUBufferPool

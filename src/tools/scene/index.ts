@@ -1,7 +1,7 @@
 import { Camera } from "../cameras/Camera";
 import { CameraController } from "../cameras/CameraController";
 import { Component } from "../components/Component";
-import { EntityObject, callFunc } from "../entitys/EntityObject";
+import { callFunc, EmptyObject } from "../entitys/EmptyObject";
 import { Logger } from "../helper";
 import { Light } from "../lights";
 import { WebGPURenderer } from "../renderer";
@@ -256,7 +256,7 @@ export class Scene implements Renderable {
     dt: number,
     t: number
   ) {
-    if (child instanceof EntityObject) {
+    if (child instanceof EmptyObject) {
       if (!child.active) return;
       Object.values(Reflect.get(child, "components")).forEach((cpn) => {
         if (cpn instanceof Component && cpn.active) {
