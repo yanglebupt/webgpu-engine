@@ -1,3 +1,4 @@
+import { EmptyObject } from "../entitys/EmptyObject";
 import { EntityObject } from "../entitys/EntityObject";
 import { Scene } from "../scene";
 import { Transform } from "./Transform";
@@ -29,20 +30,21 @@ export abstract class Component {
   }
 }
 
-type EntityObjectComponentConstructor<O extends EntityObject> = new (
+type EntityObjectComponentConstructor<O extends EmptyObject> = new (
   object: O
 ) => EntityObjectComponent<O>;
 
 export abstract class EntityObjectComponent<
-  O extends EntityObject = EntityObject
+  O extends EmptyObject = EntityObject
 > extends Component {
   public transform: Transform;
   constructor(public object: O) {
     super();
+    // @ts-ignore
     this.transform = object.transform;
   }
 }
 
-export type ComponentConstructorType<O extends EntityObject = any> =
+export type ComponentConstructorType<O extends EmptyObject = any> =
   | ComponentConstructor
   | EntityObjectComponentConstructor<O>;

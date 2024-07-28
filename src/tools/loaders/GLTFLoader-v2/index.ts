@@ -448,7 +448,6 @@ export interface GLTFScene {
 }
 export class GLTFScene extends Group {
   type: string = "GLTFScene";
-  static: boolean = true;
   public record: CreateAndSetRecord;
   constructor(
     public __json: GLTFSceneI,
@@ -749,10 +748,8 @@ export class GLTFNode extends EntityObject {
   constructor(public __json: GLTFNodeI, public mesh: GLTFMesh) {
     super();
     this.name = __json.name;
-    this.transform.applyMatrix4(readNodeTransform(__json), true);
+    this.transform.applyMatrix4(readNodeTransform(__json));
   }
-  updateBuffers() {}
-  build() {}
 }
 
 // gltf mesh ：遍历，为每个 primitive 创建对应的渲染管线

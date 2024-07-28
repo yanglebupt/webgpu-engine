@@ -1,27 +1,27 @@
 import { ShaderContext } from "..";
 import { wgsl } from "wgsl-preprocessor";
-import { Entry, Global } from "./normal.wgsl";
+import {
+  Entry,
+  Global,
+  NormalVertexShaderContextParameter,
+} from "./normal.wgsl";
 
-interface ShaderContextParameter {
-  useTexcoord: boolean;
-  useNormal: boolean;
-  bindingStart: number;
-}
-
-export default (context: ShaderContext<ShaderContextParameter>) => {
-  const { useNormal, useTexcoord, bindingStart = 0 } = context;
+export default (context: ShaderContext<NormalVertexShaderContextParameter>) => {
+  const { useNormal, useTexcoord, isSkeleton = false } = context;
+  let bindingStart = context.bindingStart;
   return wgsl/* wgsl */ `
-@group(1) @binding(${
-    bindingStart + 1
-  }) var<storage, read> positions: array<f32>;
-@group(1) @binding(${bindingStart + 2}) var<storage, read> indices: array<u32>;
-#if ${useNormal}
-@group(1) @binding(${bindingStart + 3}) var<storage, read> normals: array<f32>;
-#endif
-#if ${useTexcoord}
-@group(1) @binding(${bindingStart + 4}) var<storage, read> uv0s: array<f32>;
-#endif
 ${Global(bindingStart)}
+@group(1) @binding(${++bindingStart}) var<storage, read> positions: array<f32>;
+@group(1) @binding(${++bindingStart}) var<storage, read> indices: array<u32>;
+#if ${(useNormal ? ++bindingStart : bindingStart, useNormal)}
+@group(1) @binding(${bindingStart}) var<storage, read> normals: array<f32>;
+#endif
+#if ${(useTexcoord ? ++bindingStart : bindingStart, isSkeleton)}
+@group(1) @binding(${bindingStart}) var<storage, read> uv0s: array<f32>;
+#endif
+#if ${(isSkeleton ? ++bindingStart : bindingStart, isSkeleton)}
+@group(1) @binding(${bindingStart}) var<storage, read> bonesLength: array<f32>;
+#endif
 @vertex
 fn main(
   @builtin(vertex_index) vertexIndex : u32,
@@ -38,25 +38,25 @@ fn main(
     let elementIndexIndex = 3u * triangleIndex + localToElement[localVertexIndex]; 
     let elementIndex = indices[elementIndexIndex];
 
-    let position = vec4f(
+    var position = vec4f(
         positions[3u * elementIndex + 0u],
         positions[3u * elementIndex + 1u],
         positions[3u * elementIndex + 2u],
         1.0
     );
     #if ${useNormal}
-    let normal = vec3f(
+    var normal = vec3f(
         normals[3u * elementIndex + 0u],
         normals[3u * elementIndex + 1u],
         normals[3u * elementIndex + 2u],
     );
     #endif
     #if ${useTexcoord}
-    let uv0 = vec2f(
+    var uv0 = vec2f(
         uv0s[2u * elementIndex + 0u],
         uv0s[2u * elementIndex + 1u],
     );
     #endif
-    ${Entry(useNormal, useTexcoord)}
+    ${Entry(useNormal, useTexcoord, isSkeleton)}
 };`;
 };

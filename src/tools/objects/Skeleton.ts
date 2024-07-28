@@ -1,10 +1,10 @@
 import { BufferGeometry } from "../geometrys/BufferGeometry";
 import { MeshBasicMaterial } from "../materials/MeshBasicMaterial";
 import { Bone } from "./Bone";
-import { Mesh } from "./Mesh";
 import { Transform } from "../components/Transform";
 import { BuildOptions } from "../scene/types";
 import { EmptyObject } from "../entitys/EmptyObject";
+import { SkeletonMesh } from "./SkeletonMesh";
 
 interface BoneGeometry {
   width: number;
@@ -57,7 +57,7 @@ function createBoneVertexData(options?: Partial<BoneGeometry>) {
 }
 
 export interface NamedBones {
-  [key: string]: Bone[];
+  [key: string]: Bone | Bone[];
 }
 
 export class Skeleton extends EmptyObject {
@@ -71,24 +71,31 @@ export class Skeleton extends EmptyObject {
   type: string = "Skeleton";
   name: string = "Skeleton";
   namedBones: NamedBones;
-  visibleObject?: Mesh;
+  visibleObject?: SkeletonMesh;
   private instancesTransform: Transform[];
   constructor(namedBones: NamedBones, visible = false) {
     super();
     this.namedBones = namedBones;
-    this.instancesTransform = Object.values(namedBones).reduce(
-      //@ts-ignore
-      (pre, bones) => pre.concat(bones.map((bone) => bone.transform)),
-      []
-    ) as any as Transform[];
+    const lengths: number[] = [];
+    this.instancesTransform = Object.values(namedBones).reduce((pre, bones) => {
+      if (!Array.isArray(bones)) bones = [bones];
+      // @ts-ignore
+      return pre.concat(
+        bones.map((bone) => {
+          lengths.push(bone.length);
+          return bone.transform;
+        })
+      );
+    }, []) as any as Transform[];
     if (visible) {
       // 可视化和主体逻辑分开，不要放在一个对象上
-      this.visibleObject = new Mesh(
+      this.visibleObject = new SkeletonMesh(
         new BufferGeometry(createBoneVertexData()),
         Skeleton.material,
         this.instancesTransform.length
       );
       this.visibleObject.instancesTransform = this.instancesTransform;
+      this.visibleObject.bonesLength = lengths;
     }
   }
 
@@ -109,6 +116,8 @@ export class Skeleton extends EmptyObject {
   }
 
   getBoneByName(part: string, name: string) {
-    return this.namedBones[part].find((b) => b.name === name);
+    const bones = this.namedBones[part];
+    if (Array.isArray(bones)) return bones.find((b) => b.name === name);
+    return bones;
   }
 }

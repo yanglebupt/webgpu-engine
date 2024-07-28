@@ -8,16 +8,21 @@ import {
 } from "..";
 import { wgsl } from "wgsl-preprocessor";
 
-interface ShaderContextParameter {
+export interface NormalVertexShaderContextParameter {
   useTexcoord: boolean;
   useNormal: boolean;
   bindingStart: number;
+  isSkeleton: boolean;
 }
 
 export const Entry = (
   useNormal: boolean,
-  useTexcoord: boolean
+  useTexcoord: boolean,
+  isSkeleton: boolean
 ) => wgsl/* wgsl */ `
+    #if ${isSkeleton}
+    position.z *= bonesLength[instanceIndex];
+    #endif
     var o: VertexOutput;
     let modelTransform = ${M_INSTANCE_NAME}[instanceIndex];
     let pos = modelTransform.modelMatrix * position;
@@ -49,8 +54,9 @@ export const Global = (
 ${VPTransformationMatrixGroupBinding}
 ${MTransformationMatrixGroupBinding(bindingStart)}`;
 
-export default (context: ShaderContext<ShaderContextParameter>) => {
-  const { useNormal, useTexcoord, bindingStart = 0 } = context;
+export default (context: ShaderContext<NormalVertexShaderContextParameter>) => {
+  const { useNormal, useTexcoord, isSkeleton = false } = context;
+  let bindingStart = context.bindingStart;
   return wgsl/* wgsl */ `
 struct VertexInput {
   @location(${ShaderLocation.POSITION}) position: vec4f,
@@ -62,18 +68,21 @@ struct VertexInput {
 #endif
 };
 ${Global(bindingStart)}
+#if ${(isSkeleton ? ++bindingStart : bindingStart, isSkeleton)}
+@group(1) @binding(${bindingStart}) var<storage, read> bonesLength: array<f32>;
+#endif
 @vertex
 fn main(
   vert: VertexInput, 
   @builtin(instance_index) instanceIndex : u32
 ) -> VertexOutput {
-    let position = vert.position;
+    var position = vert.position;
     #if ${useNormal}
-    let normal = vert.normal;
+    var normal = vert.normal;
     #endif
     #if ${useTexcoord}
-    let uv0 = vert.uv0;
+    var uv0 = vert.uv0;
     #endif
-    ${Entry(useNormal, useTexcoord)}
+    ${Entry(useNormal, useTexcoord, isSkeleton)}
 };`;
 };

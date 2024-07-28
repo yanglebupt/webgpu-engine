@@ -1,4 +1,5 @@
 # 学习和案例
+
 https://webgpufundamentals.org/webgpu/lessons/webgpu-fundamentals.html 
 
 https://webgpu.github.io/webgpu-samples/
@@ -13,11 +14,21 @@ https://www.willusher.io/archive
 
 https://toji.dev/webgpu-gltf-case-study/
 
-# 骨骼动画 
+# 骨骼动画和蒙皮
+
+https://www.youtube.com/watch?v=-fjI9da-NCI
 
 https://webgl2fundamentals.org/webgl/lessons/webgl-skinning.html
 
 https://www.orillusion.com/guide/animation/skeleton.html
+
+# 物理仿真
+
+https://owlree.blog/posts/simulating-a-rope.html
+
+https://carmencincotti.com/2022-03-07/numerical-methods-euler-part-1/
+
+https://www.youtube.com/watch?v=Noo5sfGGWe0
 
 # WGSL语言介绍
 
@@ -129,6 +140,18 @@ async function frame() {
 
 ### 效果视频
 https://github.com/yanglebupt/webgpu-engine/assets/139488963/b124df6c-2506-439b-a3b3-cacda3cf3589
+
+## 碰撞检测、骨骼动画
+
+下面的功能都是基于 Component 实现的，包括后面的 physics 物理模拟部分
+
+支持三种最常见的 AABB/OBB/Sphere/Ray 直间的碰撞检测
+
+![](./public/assets/colliders.gif)
+
+支持自定义程序化骨骼动画
+
+![](./public/assets/skeleton.gif)
 
 # 框架说明
 

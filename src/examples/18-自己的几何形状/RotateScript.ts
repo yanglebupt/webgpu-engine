@@ -7,12 +7,11 @@ export class RotateScript extends EntityObjectComponent<Mesh> {
   stop: boolean = true;
   startPosX: number = 0;
   offset: number = 0;
+  private axis = vec3.normalize(vec3.create(1, 1, 0)); // 注意轴要单位化
+
   protected update(dt: number, t: number) {
     if (this.stop) return;
-    this.transform.rotateOnAxis(
-      vec3.normalize(vec3.create(1, 1, 0)), // 注意轴要单位化
-      dt * this.speed
-    );
+    this.transform.rotateOnAxis(this.axis, dt * this.speed);
     // this.transform.rotateY(dt * this.speed);
     this.transform.position[0] =
       this.startPosX + Math.sin(t * this.speed + this.offset);

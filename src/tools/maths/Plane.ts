@@ -1,4 +1,4 @@
-import { vec3, Vec3 } from "wgpu-matrix";
+import { Mat4, vec3, Vec3 } from "wgpu-matrix";
 
 export class PlaneData {
   constructor(
@@ -27,4 +27,6 @@ export class Plane extends PlaneData {
   makeCopy() {
     return new Plane().copy(this);
   }
+
+  applyMatrix4(matrix: Mat4) {}
 }

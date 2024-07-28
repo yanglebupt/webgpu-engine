@@ -13,6 +13,12 @@ export abstract class EntityObject extends EmptyObject {
     Reflect.set(this.components, Transform.name, this.transform);
   }
 
+  updateBuffers(device: GPUDevice) {}
+
+  render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
+    if (!this.static) this.updateBuffers(device);
+  }
+
   attachChildren(child: EntityObject) {
     this.transform.update();
     // 不考虑原来的父组件

@@ -246,9 +246,9 @@ export class Transform extends EntityObjectComponent {
   updateInChildren(_target?: Transform) {
     const target = _target ?? this;
     target.update();
-    target.object.children.forEach((child) =>
-      this.updateInChildren(child.transform)
-    );
+    target.object.children.forEach((child) => {
+      if (child instanceof EntityObject) this.updateInChildren(child.transform);
+    });
   }
 
   update() {

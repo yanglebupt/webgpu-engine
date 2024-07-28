@@ -1,6 +1,5 @@
 import { mat4 } from "wgpu-matrix";
 import { getBindGroupEntries } from "..";
-import { Transform } from "../components/Transform";
 import { EntityObject } from "../entitys/EntityObject";
 import { Geometry } from "../geometrys/Geometry";
 import { Material, ShaderBuildResult } from "../materials/Material";
@@ -142,7 +141,7 @@ export abstract class Object3D<
   }
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
-    if (!this.static) this.updateBuffers(device);
+    super.render(renderPass, device);
     const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
     if (vertexCount <= 0) return;
     renderPass.setPipeline(this.renderPipeline);

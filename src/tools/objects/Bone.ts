@@ -5,30 +5,34 @@ import { Direction } from "../maths/Axis";
 const _v = vec3.create();
 const _m = mat4.create();
 
+export interface BoneOptions {
+  name: string;
+  direction: Vec3;
+  length: number;
+}
+
 export class Bone extends EntityObject {
+  readonly direction: Vec3;
+  readonly length: number;
   type: string = "Bone";
   bindMatrix: Mat4 = mat4.identity(); // bind 的初始变换矩阵
   deltaMatrix: Mat4 = mat4.identity(); // 相对于 bind 的变换矩阵
 
-  constructor(
-    public name: string = "Bone",
-    public direction = vec3.create(0, -1, 0),
-    public length = 1,
-    public parentBone?: Bone
-  ) {
+  constructor(options: Partial<BoneOptions>, public parentBone?: Bone) {
     super();
-    this.direction = vec3.normalize(this.direction, this.direction);
+    this.name = options.name ?? "Bone";
+    this.length = options.length ?? 1;
+    this.direction = options.direction ?? vec3.create(0, -1, 0);
     // 指向 direction
     const up =
       vec3.equals(this.direction, Direction.up) ||
       vec3.equals(this.direction, Direction.down)
-        ? Direction.left
+        ? Direction.forward
         : Direction.up;
     const pos = this.transform.position;
     vec3.addScaled(pos, this.direction, this.length, _v);
     mat4.aim(pos, _v, up, _m);
     this.transform.applyMatrix4(_m);
-    this.transform.scale[2] *= this.length;
     if (this.parentBone) {
       this.transform.position = vec3.addScaled(
         this.parentBone.transform.getWroldPosition(_v), // 获取父节点的世界 position
@@ -41,11 +45,7 @@ export class Bone extends EntityObject {
     this.bindMatrix = this.transform.worldMatrix;
   }
 
-  generateNextBone(
-    name: string = "Bone",
-    direction: Vec3 = vec3.create(0, -1, 0),
-    length: number = 1
-  ) {
-    return new Bone(name, direction, length, this);
+  generateNextBone(options: Partial<BoneOptions>) {
+    return new Bone(options, this);
   }
 }

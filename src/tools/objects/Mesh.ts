@@ -28,10 +28,11 @@ export class Mesh<
       ? indices.length
       : geometry.getCount("POSITION");
 
-    const { vertexBindingStart: bindingStart } = this.materialBuildResult;
+    const bindingStart = this.materialBuildResult.vertexBindingStart;
+    let binding = bindingStart;
     const bindGroupLayoutEntries: GPUBindGroupLayoutEntry[] = [
       {
-        binding: bindingStart,
+        binding: binding,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       },
@@ -55,7 +56,7 @@ export class Mesh<
       buffer.unmap();
 
       bindGroupLayoutEntries.push({
-        binding: bindingStart + idx + 1,
+        binding: ++binding,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: "read-only-storage" },
       });
