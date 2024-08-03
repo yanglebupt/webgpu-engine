@@ -16,7 +16,7 @@ ${Global(bindingStart)}
 #if ${(useNormal ? ++bindingStart : bindingStart, useNormal)}
 @group(1) @binding(${bindingStart}) var<storage, read> normals: array<f32>;
 #endif
-#if ${(useTexcoord ? ++bindingStart : bindingStart, isSkeleton)}
+#if ${(useTexcoord ? ++bindingStart : bindingStart, useTexcoord)}
 @group(1) @binding(${bindingStart}) var<storage, read> uv0s: array<f32>;
 #endif
 #if ${(isSkeleton ? ++bindingStart : bindingStart, isSkeleton)}

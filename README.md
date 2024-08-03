@@ -24,9 +24,11 @@ https://www.orillusion.com/guide/animation/skeleton.html
 
 # 物理仿真
 
-https://owlree.blog/posts/simulating-a-rope.html
-
 https://carmencincotti.com/2022-03-07/numerical-methods-euler-part-1/
+
+https://www.physics.udel.edu/~bnikolic/teaching/phys660/numerical_ode/ode.html
+
+https://owlree.blog/posts/simulating-a-rope.html
 
 https://www.youtube.com/watch?v=Noo5sfGGWe0
 
@@ -178,4 +180,5 @@ API 层面的设计尽量保持和 threejs 一致，例如 geometry 和 material
 
 # 引用
 
-作为学习使用，geometrys 和 maths 从 threejs 中修改而来的
+- 作为学习使用，geometrys 和 maths 从 threejs 中修改而来的
+- 一些比较难的问题，例如  局部坐标系/Octree for unbounded scene  都是翻阅 babylonjs 源码学习的

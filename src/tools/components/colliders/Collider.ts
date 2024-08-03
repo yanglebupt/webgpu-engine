@@ -1,5 +1,4 @@
 import { EntityObject } from "../../entitys/EntityObject";
-import { Geometry } from "../../geometrys/Geometry";
 import { Object3D } from "../../objects/Object3D";
 import { EntityObjectComponent } from "../Component";
 import { MeshBasicMaterial } from "../../materials/MeshBasicMaterial";
@@ -24,10 +23,8 @@ export abstract class Collider<
 
   constructor(public object: EntityObject) {
     super(object);
-    const geometry = Reflect.get(object, "geometry") as Geometry;
-    if (!geometry) {
-      throw new Error("Can not add collider to an object without geometry!!");
-    }
+    if (!this.getGeometry())
+      throw new Error("Can not add Collider to an object without geometry!!");
   }
 
   // protected start() {

@@ -1,5 +1,6 @@
 import { EmptyObject } from "../entitys/EmptyObject";
 import { EntityObject } from "../entitys/EntityObject";
+import { Geometry } from "../geometrys/Geometry";
 import { Scene } from "../scene";
 import { Transform } from "./Transform";
 
@@ -42,6 +43,10 @@ export abstract class EntityObjectComponent<
     super();
     // @ts-ignore
     this.transform = object.transform;
+  }
+
+  getGeometry() {
+    return Reflect.get(this.object, "geometry") as Geometry;
   }
 }
 

@@ -1,5 +1,4 @@
 import { EntityObject } from "../../entitys/EntityObject";
-import { Geometry } from "../../geometrys/Geometry";
 import { BufferGeometry } from "../../geometrys/BufferGeometry";
 import { Scene } from "../../scene";
 import { Line } from "../../objects/Line";
@@ -15,7 +14,7 @@ export class OBBCollider extends Collider<OBB> {
 
   constructor(public object: EntityObject) {
     super(object);
-    const { positions } = Reflect.get(object, "geometry") as Geometry;
+    const { positions } = this.getGeometry();
     this.collisionPrimitive = new OBB();
     _box3.setFromBufferAttribute(positions);
     this.collisionPrimitive.fromBox3(_box3);

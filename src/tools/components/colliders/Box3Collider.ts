@@ -1,5 +1,4 @@
 import { EntityObject } from "../../entitys/EntityObject";
-import { Geometry } from "../../geometrys/Geometry";
 import { BufferGeometry } from "../../geometrys/BufferGeometry";
 import { Scene } from "../../scene";
 import { Line } from "../../objects/Line";
@@ -12,7 +11,7 @@ export class Box3Collider extends Collider<Box3> {
 
   constructor(public object: EntityObject) {
     super(object);
-    const { positions } = Reflect.get(object, "geometry") as Geometry;
+    const { positions } = this.getGeometry();
     this.collisionPrimitive = new Box3();
     this.collisionPrimitive.setFromBufferAttribute(positions);
     this.collisionPrimitive.keepInit();

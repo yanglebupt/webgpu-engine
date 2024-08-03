@@ -11,14 +11,19 @@ export class BufferAttribute<T extends TypedArray> {
     return this.array.length / this.itemSize;
   }
 
-  get(itemIndex: number) {
+  ref(itemIndex: number) {
     const l = this.itemSize;
     const start = itemIndex * l;
-    const res: number[] = [];
-    for (let i = 0; i < l; i++) {
-      res.push(this.array[start + i]);
-    }
-    return res;
+    return this.array.subarray(start, start + l) as T;
+  }
+
+  get(itemIndex: number) {
+    return [...this.ref(itemIndex)];
+  }
+
+  set(itemIndex: number, value: number[]) {
+    if (value.length > this.itemSize) return;
+    this.ref(itemIndex).set(value);
   }
 }
 

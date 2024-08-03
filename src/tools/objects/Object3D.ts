@@ -1,7 +1,7 @@
-import { mat4 } from "wgpu-matrix";
+import { mat4, vec3 } from "wgpu-matrix";
 import { getBindGroupEntries } from "..";
 import { EntityObject } from "../entitys/EntityObject";
-import { Geometry } from "../geometrys/Geometry";
+import { BufferAttribute, Geometry } from "../geometrys/Geometry";
 import { Material, ShaderBuildResult } from "../materials/Material";
 import { GPUShaderModuleCacheKey } from "../scene/cache";
 import { BuildOptions } from "../scene/types";
@@ -13,6 +13,7 @@ import {
   ObservableProxy,
   WatchPropertyKey,
 } from "../utils/Observable";
+import { WireframeGeometry } from "../geometrys/WireframeGeometry";
 
 export enum WatchAction {
   Geometry = "buildGeometry",
@@ -51,6 +52,7 @@ export abstract class Object3D<
   protected geometryBuildResult!: {
     vertexCount: number;
     vertexBuffer?: GPUBuffer;
+    bufferOffsetAndSize?: Array<{ offset: number; size: number }>;
     bufferLayout?: GPUVertexBufferLayout[];
     vertex: GPUShaderModuleCacheKey<any>;
     bindGroupLayoutEntries: GPUBindGroupLayoutEntry[];
@@ -142,10 +144,17 @@ export abstract class Object3D<
 
   render(renderPass: GPURenderPassEncoder, device: GPUDevice) {
     super.render(renderPass, device);
-    const { vertexBuffer, vertexCount, indices } = this.geometryBuildResult;
+    const { vertexBuffer, bufferOffsetAndSize, vertexCount, indices } =
+      this.geometryBuildResult;
     if (vertexCount <= 0) return;
     renderPass.setPipeline(this.renderPipeline);
-    if (vertexBuffer) renderPass.setVertexBuffer(0, vertexBuffer);
+    if (vertexBuffer) {
+      if (bufferOffsetAndSize)
+        bufferOffsetAndSize.forEach(({ offset, size }, idx) => {
+          renderPass.setVertexBuffer(idx, vertexBuffer, offset, size);
+        });
+      else renderPass.setVertexBuffer(0, vertexBuffer);
+    }
     this.bindGroups.forEach((group, index) => {
       renderPass.setBindGroup(index + 1, group);
     });
@@ -205,51 +214,66 @@ export abstract class Object3D<
     const useNormal = !!normals;
     const useTexcoord = !!uvs;
 
-    const arrayStride =
-      Float32Array.BYTES_PER_ELEMENT *
-      (3 + (useNormal ? 3 : 0) + (useTexcoord ? 2 : 0));
-
-    const attributes: GPUVertexAttribute[] = [
+    // position 和 其他顶点信息分开，因为后面模拟粒子需要更新 position，要确保 position buffer 连续这样才容易更新
+    const f32UnitByte = Float32Array.BYTES_PER_ELEMENT;
+    const bufferLayout: GPUVertexBufferLayout[] = [
       {
-        shaderLocation: ShaderLocation.POSITION,
-        format: "float32x3",
-        offset: 0,
+        arrayStride: 3 * f32UnitByte,
+        stepMode: "vertex",
+        attributes: [
+          {
+            shaderLocation: ShaderLocation.POSITION,
+            format: "float32x3",
+            offset: 0,
+          },
+        ],
       },
     ];
+    const arrayStride =
+      f32UnitByte * ((useNormal ? 3 : 0) + (useTexcoord ? 2 : 0));
+    const attributes: GPUVertexAttribute[] = [];
     if (useNormal)
       attributes.push({
         shaderLocation: ShaderLocation.NORMAL,
         format: "float32x3",
-        offset: 3 * Float32Array.BYTES_PER_ELEMENT,
+        offset: 0,
       });
     if (useTexcoord)
       attributes.push({
         shaderLocation: ShaderLocation.TEXCOORD_0,
         format: "float32x2",
-        offset: (3 + (useNormal ? 3 : 0)) * Float32Array.BYTES_PER_ELEMENT,
+        offset: (useNormal ? 3 : 0) * f32UnitByte,
       });
-    const bufferLayout: GPUVertexBufferLayout[] = [
-      {
+    if (attributes.length > 0)
+      bufferLayout.push({
         arrayStride,
         stepMode: "vertex",
         attributes,
-      },
-    ];
+      });
 
+    const bufferOffsetAndSize: Array<{ offset: number; size: number }> = [];
+    for (let i = 0, l = bufferLayout.length; i < l; i++) {
+      bufferOffsetAndSize.push({
+        offset: i == 0 ? 0 : bufferOffsetAndSize[i - 1].size,
+        size: bufferLayout[i].arrayStride * vertexCount,
+      });
+    }
+    const offset = 3 * vertexCount;
     const vertexBuffer = device.createBuffer({
-      size: arrayStride * vertexCount,
-      usage: GPUBufferUsage.VERTEX,
+      size: offset * f32UnitByte + arrayStride * vertexCount,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
     const vertexData = new Float32Array(vertexBuffer.getMappedRange());
 
+    vertexData.subarray(0, offset).set(positions);
+
     for (let i = 0; i < vertexCount; i++) {
-      const vertex = positions.slice(i * 3, (i + 1) * 3);
       const normal = useNormal ? normals.slice(i * 3, (i + 1) * 3) : [];
       const uv = useTexcoord ? uvs.slice(i * 2, (i + 1) * 2) : [];
       vertexData.set(
-        Float32Array.of(...vertex, ...normal, ...uv),
-        (i * arrayStride) / Float32Array.BYTES_PER_ELEMENT
+        Float32Array.of(...normal, ...uv),
+        offset + (i * arrayStride) / f32UnitByte
       );
     }
     vertexBuffer.unmap();
@@ -271,6 +295,7 @@ export abstract class Object3D<
     this.geometryBuildResult = {
       vertexCount,
       vertexBuffer,
+      bufferOffsetAndSize,
       bufferLayout,
       vertex: {
         code: vertex,
@@ -292,6 +317,30 @@ export abstract class Object3D<
       ],
       resources: [],
     };
+  }
+
+  get vertexBuffer(): GPUBuffer | undefined {
+    return this.geometryBuildResult.vertexBuffer;
+  }
+
+  // 用于粒子模拟更新顶点位置的
+  updateVertexAll(posEdge: WireframeGeometry) {
+    const device = this.buildOptions.device;
+    const vertexBuffer = this.vertexBuffer;
+    if (!device || !vertexBuffer) return;
+    const { vertexMapping, positions: vertexPositions } = posEdge;
+    const positions = this.geometry.positions;
+    for (let i = 0, l = vertexMapping.length; i < l; i++) {
+      const indexs = vertexMapping[i];
+      const value = vertexPositions.get(i);
+      vec3.transformMat4(
+        value,
+        mat4.inverse(this.transform.worldMatrix),
+        value
+      );
+      indexs.forEach((index) => positions.set(index, value));
+    }
+    device.queue.writeBuffer(this.vertexBuffer, 0, positions.array);
   }
 
   buildMaterial(options: BuildOptions) {

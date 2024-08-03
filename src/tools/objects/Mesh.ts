@@ -1,4 +1,5 @@
 import { Geometry } from "../geometrys/Geometry";
+import { WireframeGeometry } from "../geometrys/WireframeGeometry";
 import { MeshMaterial } from "../materials/MeshMaterial";
 import { BuildOptions } from "../scene/types";
 import wireframe from "../shaders/vertex-wgsl/wireframe.wgsl";
@@ -20,6 +21,14 @@ export class Mesh<
   };
 
   type: string = "Mesh";
+
+  get vertexBuffer(): GPUBuffer {
+    return (
+      this.material.wireframe
+        ? this.geometryBuildResult.resources[0]
+        : this.geometryBuildResult.vertexBuffer
+    ) as GPUBuffer;
+  }
 
   buildWireframe(device: GPUDevice) {
     const geometry = this.geometry;
@@ -46,7 +55,7 @@ export class Mesh<
         size: isIndex
           ? array.length * Uint32Array.BYTES_PER_ELEMENT
           : array.byteLength,
-        usage: GPUBufferUsage.STORAGE,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         mappedAtCreation: true,
       });
       resources.push(buffer);

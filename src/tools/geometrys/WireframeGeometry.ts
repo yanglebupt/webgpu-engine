@@ -14,7 +14,7 @@ export function isUniqueEdge(
   const hash1 = `${start[0]},${start[1]},${start[2]}-${end[0]},${end[1]},${end[2]}`;
   const hash2 = `${end[0]},${end[1]},${end[2]}-${start[0]},${start[1]},${start[2]}`; // coincident edge
 
-  if (edges.has(hash1) === true || edges.has(hash2) === true) {
+  if (edges.has(hash1) || edges.has(hash2)) {
     return false;
   } else {
     edges.add(hash1);
@@ -35,6 +35,8 @@ export function isUniqueVertex(vertex: number[], vertices: Array<number[]>) {
 }
 
 export class WireframeGeometry extends Geometry {
+  // 可以通过 vertexMapping 来找到点与点的对应关系
+  vertexMapping: Array<Set<number>> = [];
   constructor(geometry: Geometry) {
     super();
     const { positions, indices } = geometry;
@@ -47,52 +49,44 @@ export class WireframeGeometry extends Geometry {
 
     // create a data structure that contains all edges without duplicates
 
+    const handleFace = (a: number, b: number, c: number) => {
+      const p1 = positions.get(a);
+      const p2 = positions.get(b);
+      const p3 = positions.get(c);
+
+      // lines
+      (
+        [
+          [p1, p2, a, b],
+          [p2, p3, b, c],
+          [p3, p1, c, a],
+        ] as Array<[number[], number[], number, number]>
+      ).forEach(([start, end, startIdx, endIdx]) => {
+        const _isUniqueEdge = isUniqueEdge(start, end, edges);
+
+        let idx = isUniqueVertex(start, vertices);
+        _isUniqueEdge && _indices.push(idx);
+        this.pushVertexMapping(idx, startIdx);
+
+        idx = isUniqueVertex(end, vertices);
+        _isUniqueEdge && _indices.push(idx);
+        this.pushVertexMapping(idx, endIdx);
+      });
+    };
+
     if (indices) {
       for (let i = 0, l = indices.length; i < l; i += 3) {
         // face
-
         const a = indices.get(i)[0];
         const b = indices.get(i + 1)[0];
         const c = indices.get(i + 2)[0];
 
-        const p1 = positions.get(a);
-        const p2 = positions.get(b);
-        const p3 = positions.get(c);
-
-        // lines
-        (
-          [
-            [p1, p2],
-            [p2, p3],
-            [p3, p1],
-          ] as Array<[number[], number[]]>
-        ).forEach(([start, end]) => {
-          if (isUniqueEdge(start, end, edges) === true) {
-            _indices.push(isUniqueVertex(start, vertices));
-            _indices.push(isUniqueVertex(end, vertices));
-          }
-        });
+        handleFace(a, b, c);
       }
     } else {
       for (let i = 0, l = positions.count; i < l; i += 3) {
         // face
-        const p1 = positions.get(i);
-        const p2 = positions.get(i + 1);
-        const p3 = positions.get(i + 2);
-
-        // lines
-        (
-          [
-            [p1, p2],
-            [p2, p3],
-            [p3, p1],
-          ] as Array<[number[], number[]]>
-        ).forEach(([start, end]) => {
-          if (isUniqueEdge(start, end, edges) === true) {
-            _indices.push(isUniqueVertex(start, vertices));
-            _indices.push(isUniqueVertex(end, vertices));
-          }
-        });
+        handleFace(i, i + 1, i + 2);
       }
     }
 
@@ -106,5 +100,14 @@ export class WireframeGeometry extends Geometry {
       new (this.indexFormat === "uint16" ? Uint16Array : Uint32Array)(_indices),
       VertexAttributeElementSize.INDICE
     );
+  }
+
+  private pushVertexMapping(idx: number, ridx: number) {
+    let ridxs = this.vertexMapping[idx];
+    if (!ridxs) {
+      ridxs = new Set();
+      this.vertexMapping[idx] = ridxs;
+    }
+    ridxs.add(ridx);
   }
 }

@@ -1,6 +1,5 @@
 import { vec3 } from "wgpu-matrix";
 import { EntityObject } from "../../entitys/EntityObject";
-import { Geometry } from "../../geometrys/Geometry";
 import { SphereGeometry } from "../../geometrys/SphereGeometry";
 import { Sphere } from "../../maths/Sphere";
 import { Mesh } from "../../objects/Mesh";
@@ -12,7 +11,7 @@ export class SphereCollider extends Collider<Sphere> {
 
   constructor(public object: EntityObject) {
     super(object);
-    const { positions } = Reflect.get(object, "geometry") as Geometry;
+    const { positions } = this.getGeometry();
     this.collisionPrimitive = new Sphere();
     this.collisionPrimitive.setFromBufferAttribute(positions);
     this.collisionPrimitive.keepInit();

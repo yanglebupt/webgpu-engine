@@ -258,6 +258,7 @@ export class Scene implements Renderable {
   ) {
     if (child instanceof EmptyObject) {
       if (!child.active) return;
+      // TODO: 调整 awaked/start/update 的执行顺序
       Object.values(Reflect.get(child, "components")).forEach((cpn) => {
         if (cpn instanceof Component && cpn.active) {
           if (!Reflect.get(cpn, "isStarted")) {
@@ -265,7 +266,7 @@ export class Scene implements Renderable {
             Reflect.set(cpn, "isStarted", true);
             if (this.options.development) callFunc(cpn, "helper", [this]);
           }
-          if (!child.static) callFunc(cpn, "update", [dt, t]);
+          if (!child.static && dt > 0) callFunc(cpn, "update", [dt, t]);
         }
       });
       child.children.forEach((child) =>
